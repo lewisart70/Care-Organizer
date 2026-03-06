@@ -1,0 +1,175 @@
+import React, { useState, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, TextInput, Modal, Alert, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../src/context/AuthContext';
+import { api } from '../../src/utils/api';
+import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../../src/constants/theme';
+
+const CATEGORIES = ['general', 'medical', 'behavior', 'dietary', 'activity', 'mood'];
+
+export default function NotesTab() {
+  const { selectedRecipientId } = useAuth();
+  const [notes, setNotes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [content, setContent] = useState('');
+  const [category, setCategory] = useState('general');
+  const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState('all');
+
+  const loadNotes = useCallback(async () => {
+    if (!selectedRecipientId) { setLoading(false); return; }
+    try { setNotes(await api.get(`/care-recipients/${selectedRecipientId}/notes`)); }
+    catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  }, [selectedRecipientId]);
+
+  useFocusEffect(useCallback(() => { loadNotes(); }, [loadNotes]));
+
+  const handleAdd = async () => {
+    if (!content.trim()) { Alert.alert('Required', 'Please enter a note'); return; }
+    setSaving(true);
+    try {
+      await api.post(`/care-recipients/${selectedRecipientId}/notes`, { content, category });
+      setShowAdd(false); setContent(''); setCategory('general');
+      await loadNotes();
+    } catch (e: any) { Alert.alert('Error', e.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async (noteId: string) => {
+    try { await api.del(`/care-recipients/${selectedRecipientId}/notes/${noteId}`); await loadNotes(); }
+    catch (e: any) { Alert.alert('Error', e.message); }
+  };
+
+  const filtered = filter === 'all' ? notes : notes.filter(n => n.category === filter);
+
+  const getCategoryColor = (cat: string) => {
+    const colors: Record<string, string> = { general: COLORS.info, medical: COLORS.error, behavior: COLORS.warning, dietary: COLORS.secondary, activity: COLORS.primary, mood: '#9B59B6' };
+    return colors[cat] || COLORS.info;
+  };
+
+  if (!selectedRecipientId) return <SafeAreaView style={styles.container}><View style={styles.centered}><Text style={styles.emptyText}>Select a care recipient first</Text></View></SafeAreaView>;
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Caregiver Notes</Text>
+        <TouchableOpacity testID="add-note-btn" style={styles.addIconBtn} onPress={() => setShowAdd(true)}>
+          <Ionicons name="add-circle" size={28} color={COLORS.primary} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+        {['all', ...CATEGORIES].map(cat => (
+          <TouchableOpacity key={cat} testID={`filter-${cat}`} style={[styles.filterChip, filter === cat && styles.filterActive]}
+            onPress={() => setFilter(cat)}>
+            <Text style={[styles.filterText, filter === cat && styles.filterTextActive]}>
+              {cat.charAt(0).toUpperCase() + cat.slice(1)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <ScrollView refreshControl={<RefreshControl refreshing={false} onRefresh={loadNotes} tintColor={COLORS.primary} />}>
+        {loading ? <ActivityIndicator color={COLORS.primary} style={{ marginTop: SPACING.xl }} /> :
+          filtered.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="document-text-outline" size={48} color={COLORS.primaryLight} />
+              <Text style={styles.emptyTitle}>No notes yet</Text>
+              <Text style={styles.emptyText}>Add notes to track daily observations</Text>
+            </View>
+          ) : filtered.map(note => (
+            <View key={note.note_id} style={styles.noteCard}>
+              <View style={styles.noteHeader}>
+                <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(note.category) + '15' }]}>
+                  <Text style={[styles.categoryText, { color: getCategoryColor(note.category) }]}>{note.category}</Text>
+                </View>
+                <TouchableOpacity testID={`delete-note-${note.note_id}`} onPress={() => handleDelete(note.note_id)}>
+                  <Ionicons name="trash-outline" size={18} color={COLORS.error} />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.noteContent}>{note.content}</Text>
+              <View style={styles.noteMeta}>
+                <Text style={styles.noteAuthor}>{note.author_name}</Text>
+                <Text style={styles.noteDate}>{note.created_at ? new Date(note.created_at).toLocaleDateString() : ''}</Text>
+              </View>
+            </View>
+          ))}
+      </ScrollView>
+
+      <Modal visible={showAdd} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowAdd(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
+            <Text style={styles.modalTitle}>Add Note</Text>
+            <TouchableOpacity testID="save-note-btn" onPress={handleAdd} disabled={saving}>
+              {saving ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Text style={styles.saveText}>Save</Text>}
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.modalBody}>
+            <Text style={styles.formLabel}>Category</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SPACING.md }}>
+              {CATEGORIES.map(cat => (
+                <TouchableOpacity key={cat} testID={`cat-${cat}`} style={[styles.catChip, category === cat && { backgroundColor: getCategoryColor(cat) }]}
+                  onPress={() => setCategory(cat)}>
+                  <Text style={[styles.catChipText, category === cat && { color: COLORS.white }]}>
+                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <Text style={styles.formLabel}>Note</Text>
+            <TextInput
+              testID="note-content-input"
+              style={styles.textArea}
+              placeholder="Write your observation or note..."
+              placeholderTextColor={COLORS.border}
+              value={content}
+              onChangeText={setContent}
+              multiline
+              numberOfLines={6}
+              textAlignVertical="top"
+            />
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: COLORS.background },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingTop: SPACING.md },
+  headerTitle: { fontSize: FONT_SIZES.xxl, fontWeight: '800', color: COLORS.textPrimary },
+  addIconBtn: { padding: SPACING.xs },
+  filterScroll: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, maxHeight: 50 },
+  filterChip: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs, borderRadius: RADIUS.full, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, marginRight: SPACING.sm },
+  filterActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  filterText: { fontSize: FONT_SIZES.xs, fontWeight: '600', color: COLORS.textSecondary },
+  filterTextActive: { color: COLORS.white },
+  emptyState: { alignItems: 'center', paddingVertical: SPACING.xxl },
+  emptyTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary, marginTop: SPACING.md },
+  emptyText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: SPACING.xs },
+  noteCard: { marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, padding: SPACING.md, backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, shadowColor: COLORS.cardShadow, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 1, shadowRadius: 4, elevation: 2 },
+  noteHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm },
+  categoryBadge: { paddingHorizontal: SPACING.sm, paddingVertical: 2, borderRadius: RADIUS.full },
+  categoryText: { fontSize: FONT_SIZES.xs, fontWeight: '700' },
+  noteContent: { fontSize: FONT_SIZES.sm, color: COLORS.textPrimary, lineHeight: 20 },
+  noteMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: SPACING.sm },
+  noteAuthor: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, fontStyle: 'italic' },
+  noteDate: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary },
+  modalContainer: { flex: 1, backgroundColor: COLORS.background },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  modalTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary },
+  cancelText: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary },
+  saveText: { fontSize: FONT_SIZES.md, color: COLORS.primary, fontWeight: '700' },
+  modalBody: { padding: SPACING.lg },
+  formLabel: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textPrimary, marginBottom: SPACING.xs },
+  catChip: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs, borderRadius: RADIUS.full, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, marginRight: SPACING.sm },
+  catChipText: { fontSize: FONT_SIZES.xs, fontWeight: '600', color: COLORS.textSecondary },
+  textArea: { backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, padding: SPACING.md, fontSize: FONT_SIZES.md, color: COLORS.textPrimary, minHeight: 150 },
+});
