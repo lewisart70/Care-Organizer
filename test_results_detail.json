@@ -1,0 +1,90 @@
+[
+  {
+    "test": "User Registration",
+    "success": true,
+    "message": "User registered successfully",
+    "timestamp": "2026-03-06T23:50:28.920905",
+    "response_data": {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoidXNlcl9lNGJiNWE2NTU3NDUiLCJlbWFpbCI6ImNhcmV0ZXN0QGV4YW1wbGUuY29tIiwiZXhwIjoxNzczNDQ1ODI4fQ.DheS47cl3TPlQYYQmZhRQnUkDVbmh5EH4d8T_acgKs8",
+      "user": {
+        "user_id": "user_e4bb5a655745",
+        "email": "caretest@example.com",
+        "name": "Care Test User",
+        "picture": null
+      }
+    }
+  },
+  {
+    "test": "Create Care Recipient",
+    "success": true,
+    "message": "Care recipient created successfully",
+    "timestamp": "2026-03-06T23:50:29.487680",
+    "response_data": {
+      "recipient_id": "cr_0351d44539cc",
+      "name": "Margaret Wilson",
+      "date_of_birth": "1945-03-20",
+      "gender": "female",
+      "address": null,
+      "phone": null,
+      "medical_conditions": [
+        "Diabetes",
+        "Arthritis"
+      ],
+      "allergies": [
+        "Penicillin"
+      ],
+      "blood_type": null,
+      "health_card_number": null,
+      "insurance_info": null,
+      "interests": [],
+      "notes": null,
+      "caregivers": [
+        "user_e4bb5a655745"
+      ],
+      "created_by": "user_e4bb5a655745",
+      "created_at": "2026-03-06T23:50:29.462334+00:00"
+    }
+  },
+  {
+    "test": "Authentication Required",
+    "success": true,
+    "message": "Endpoints properly require authentication",
+    "timestamp": "2026-03-06T23:50:30.049971",
+    "response_data": null
+  },
+  {
+    "test": "Profile Photo Upload",
+    "success": true,
+    "message": "Profile photo uploaded successfully",
+    "timestamp": "2026-03-06T23:50:30.615741",
+    "response_data": {
+      "message": "Profile photo updated successfully"
+    }
+  },
+  {
+    "test": "Get Recipient with Photo",
+    "success": true,
+    "message": "Profile photo field exists and has data",
+    "timestamp": "2026-03-06T23:50:31.182809",
+    "response_data": {
+      "has_profile_photo": true,
+      "photo_length": 407
+    }
+  },
+  {
+    "test": "Profile Photo Delete",
+    "success": true,
+    "message": "Profile photo deleted successfully",
+    "timestamp": "2026-03-06T23:50:31.754339",
+    "response_data": {
+      "message": "Profile photo removed"
+    }
+  },
+  {
+    "test": "Audio Transcription",
+    "success": true,
+    "message": "Endpoint exists and processes requests (expected failure with invalid audio)",
+    "timestamp": "2026-03-06T23:50:39.591170",
+    "response_data": "{\"detail\":\"Transcription failed: Failed to transcribe audio: litellm.BadRequestError: OpenAIException - litellm.BadRequestError: OpenAIException - Invalid file format. Supported formats: ['flac', 'm4a', 'mp3', 'mp4', 'mpeg', 'mpga', 'oga', 'ogg', 'wav', 'webm']. Received Model Group=whisper-1\\nAvailable Model Group Fallbacks=None\"}"
+  }
+]

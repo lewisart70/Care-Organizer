@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../src/context/AuthContext';
 import { api } from '../src/utils/api';
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../src/constants/theme';
@@ -11,6 +12,7 @@ export default function AddRecipientScreen() {
   const { setSelectedRecipientId } = useAuth();
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '', date_of_birth: '', gender: '', address: '', phone: '',
     blood_type: '', health_card_number: '', insurance_info: '', notes: '',
@@ -18,6 +20,71 @@ export default function AddRecipientScreen() {
   const [conditions, setConditions] = useState('');
   const [allergies, setAllergies] = useState('');
   const [interests, setInterests] = useState('');
+
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Photo library access is required to add a profile photo');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        const base64Uri = `data:image/jpeg;base64,${asset.base64}`;
+        setProfilePhoto(base64Uri);
+      }
+    } catch (err) {
+      console.error('Image picker error:', err);
+      Alert.alert('Error', 'Failed to select image');
+    }
+  };
+
+  const takePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Camera access is required to take a photo');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        const base64Uri = `data:image/jpeg;base64,${asset.base64}`;
+        setProfilePhoto(base64Uri);
+      }
+    } catch (err) {
+      console.error('Camera error:', err);
+      Alert.alert('Error', 'Failed to take photo');
+    }
+  };
+
+  const showPhotoOptions = () => {
+    Alert.alert(
+      'Add Profile Photo',
+      'Choose how to add a photo of the care recipient',
+      [
+        { text: 'Take Photo', onPress: takePhoto },
+        { text: 'Choose from Library', onPress: pickImage },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
 
   const handleSave = async () => {
     if (!form.name.trim()) { Alert.alert('Required', 'Name is required'); return; }
@@ -30,6 +97,19 @@ export default function AddRecipientScreen() {
         interests: interests ? interests.split(',').map(s => s.trim()).filter(Boolean) : [],
       };
       const result = await api.post('/care-recipients', body);
+      
+      // Upload profile photo if one was selected
+      if (profilePhoto) {
+        try {
+          await api.post(`/care-recipients/${result.recipient_id}/profile-photo`, {
+            photo_base64: profilePhoto
+          });
+        } catch (photoErr) {
+          console.error('Failed to upload photo:', photoErr);
+          // Don't fail the whole operation if photo upload fails
+        }
+      }
+      
       setSelectedRecipientId(result.recipient_id);
       router.back();
     } catch (e: any) { Alert.alert('Error', e.message); }
@@ -60,6 +140,30 @@ export default function AddRecipientScreen() {
           </TouchableOpacity>
         </View>
         <ScrollView style={styles.body} keyboardShouldPersistTaps="handled">
+          {/* Profile Photo Section */}
+          <View style={styles.photoSection}>
+            <TouchableOpacity 
+              testID="add-profile-photo-btn"
+              style={styles.photoContainer} 
+              onPress={showPhotoOptions}
+            >
+              {profilePhoto ? (
+                <Image source={{ uri: profilePhoto }} style={styles.profilePhoto} />
+              ) : (
+                <View style={styles.photoPlaceholder}>
+                  <Ionicons name="camera" size={32} color={COLORS.textSecondary} />
+                  <Text style={styles.photoPlaceholderText}>Add Photo</Text>
+                </View>
+              )}
+              <View style={styles.editBadge}>
+                <Ionicons name="pencil" size={12} color={COLORS.white} />
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.photoHint}>
+              Add a photo to help PSWs/caregivers identify the client
+            </Text>
+          </View>
+
           {fields.map(({ key, label, placeholder, icon }) => (
             <View key={key} style={styles.formGroup}>
               <Text style={styles.formLabel}>{label}</Text>
@@ -104,6 +208,57 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary },
   saveText: { fontSize: FONT_SIZES.md, color: COLORS.primary, fontWeight: '700' },
   body: { padding: SPACING.lg },
+  
+  // Photo section styles
+  photoSection: { alignItems: 'center', marginBottom: SPACING.xl },
+  photoContainer: { 
+    width: 120, 
+    height: 120, 
+    borderRadius: 60, 
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  profilePhoto: { 
+    width: '100%', 
+    height: '100%',
+  },
+  photoPlaceholder: { 
+    width: '100%', 
+    height: '100%', 
+    backgroundColor: COLORS.surface, 
+    borderWidth: 2, 
+    borderColor: COLORS.border, 
+    borderStyle: 'dashed',
+    borderRadius: 60,
+    justifyContent: 'center', 
+    alignItems: 'center',
+  },
+  photoPlaceholderText: { 
+    fontSize: FONT_SIZES.xs, 
+    color: COLORS.textSecondary, 
+    marginTop: SPACING.xs,
+  },
+  editBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.white,
+  },
+  photoHint: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.xl,
+  },
+
   formGroup: { marginBottom: SPACING.md },
   formLabel: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textPrimary, marginBottom: SPACING.xs },
   inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, paddingHorizontal: SPACING.md, height: 48 },

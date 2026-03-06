@@ -1,9 +1,9 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, TextInput, Modal, Alert, RefreshControl, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, TextInput, Modal, Alert, RefreshControl, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
+import { useAudioRecorder, RecordingPresets, setAudioModeAsync } from 'expo-audio';
 import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/utils/api';
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../../src/constants/theme';
@@ -19,7 +19,13 @@ export default function NotesTab() {
   const [category, setCategory] = useState('general');
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState('all');
-  const [photo, setPhoto] = useState<string | null>(null);
+  
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  
+  // Audio recorder hook
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   const loadNotes = useCallback(async () => {
     if (!selectedRecipientId) { setLoading(false); return; }
@@ -29,6 +35,77 @@ export default function NotesTab() {
   }, [selectedRecipientId]);
 
   useFocusEffect(useCallback(() => { loadNotes(); }, [loadNotes]));
+
+  const startRecording = async () => {
+    try {
+      // Set audio mode for recording
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+      });
+
+      // Prepare and start recording
+      await recorder.prepareToRecordAsync();
+      await recorder.record();
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Failed to start recording:', err);
+      Alert.alert('Error', 'Failed to start recording. Please check microphone permissions.');
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!isRecording) return;
+
+    setIsRecording(false);
+    setIsTranscribing(true);
+
+    try {
+      await recorder.stop();
+      const uri = recorder.uri;
+
+      if (uri) {
+        // Convert audio to base64
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const result = reader.result as string;
+            resolve(result);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+
+        // Send to backend for transcription
+        const result = await api.post('/transcribe', {
+          audio_base64: base64,
+          language: 'en',
+        });
+
+        if (result.success && result.text) {
+          // Append transcribed text to existing content
+          setContent(prev => {
+            if (prev.trim()) {
+              return prev + ' ' + result.text;
+            }
+            return result.text;
+          });
+        }
+      }
+    } catch (err: any) {
+      console.error('Transcription error:', err);
+      Alert.alert('Transcription Failed', err.message || 'Could not transcribe audio');
+    } finally {
+      setIsTranscribing(false);
+      // Reset audio mode
+      await setAudioModeAsync({
+        allowsRecording: false,
+      });
+    }
+  };
 
   const handleAdd = async () => {
     if (!content.trim()) { Alert.alert('Required', 'Please enter a note'); return; }
@@ -105,13 +182,15 @@ export default function NotesTab() {
       <Modal visible={showAdd} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowAdd(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => { setShowAdd(false); setContent(''); }}>
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
             <Text style={styles.modalTitle}>Add Note</Text>
             <TouchableOpacity testID="save-note-btn" onPress={handleAdd} disabled={saving}>
               {saving ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Text style={styles.saveText}>Save</Text>}
             </TouchableOpacity>
           </View>
-          <ScrollView style={styles.modalBody}>
+          <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
             <Text style={styles.formLabel}>Category</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SPACING.md }}>
               {CATEGORIES.map(cat => (
@@ -123,11 +202,54 @@ export default function NotesTab() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <Text style={styles.formLabel}>Note</Text>
+            
+            <View style={styles.noteLabelRow}>
+              <Text style={styles.formLabel}>Note</Text>
+              <TouchableOpacity 
+                testID="voice-record-btn"
+                style={[
+                  styles.voiceBtn, 
+                  isRecording && styles.voiceBtnRecording,
+                  isTranscribing && styles.voiceBtnTranscribing
+                ]}
+                onPress={isRecording ? stopRecording : startRecording}
+                disabled={isTranscribing}
+              >
+                {isTranscribing ? (
+                  <ActivityIndicator size="small" color={COLORS.white} />
+                ) : (
+                  <>
+                    <Ionicons 
+                      name={isRecording ? "stop" : "mic"} 
+                      size={16} 
+                      color={COLORS.white} 
+                    />
+                    <Text style={styles.voiceBtnText}>
+                      {isRecording ? 'Stop' : 'Voice'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+            
+            {isRecording && (
+              <View style={styles.recordingIndicator}>
+                <View style={styles.recordingDot} />
+                <Text style={styles.recordingText}>Recording... Tap "Stop" when done</Text>
+              </View>
+            )}
+            
+            {isTranscribing && (
+              <View style={styles.transcribingIndicator}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+                <Text style={styles.transcribingText}>Converting speech to text...</Text>
+              </View>
+            )}
+            
             <TextInput
               testID="note-content-input"
               style={styles.textArea}
-              placeholder="Write your observation or note..."
+              placeholder="Write your observation or use voice input..."
               placeholderTextColor={COLORS.border}
               value={content}
               onChangeText={setContent}
@@ -135,6 +257,13 @@ export default function NotesTab() {
               numberOfLines={6}
               textAlignVertical="top"
             />
+            
+            <View style={styles.voiceHint}>
+              <Ionicons name="information-circle-outline" size={16} color={COLORS.textSecondary} />
+              <Text style={styles.voiceHintText}>
+                Tap the Voice button to dictate your notes hands-free
+              </Text>
+            </View>
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -174,4 +303,72 @@ const styles = StyleSheet.create({
   catChip: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs, borderRadius: RADIUS.full, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, marginRight: SPACING.sm },
   catChipText: { fontSize: FONT_SIZES.xs, fontWeight: '600', color: COLORS.textSecondary },
   textArea: { backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, padding: SPACING.md, fontSize: FONT_SIZES.md, color: COLORS.textPrimary, minHeight: 150 },
+  
+  // Voice recording styles
+  noteLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xs },
+  voiceBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: COLORS.secondary, 
+    paddingHorizontal: SPACING.md, 
+    paddingVertical: SPACING.xs, 
+    borderRadius: RADIUS.full,
+    gap: 4,
+  },
+  voiceBtnRecording: { 
+    backgroundColor: COLORS.error,
+  },
+  voiceBtnTranscribing: { 
+    backgroundColor: COLORS.info,
+  },
+  voiceBtnText: { 
+    color: COLORS.white, 
+    fontSize: FONT_SIZES.xs, 
+    fontWeight: '700',
+  },
+  recordingIndicator: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: COLORS.error + '15',
+    padding: SPACING.sm,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+  },
+  recordingDot: { 
+    width: 8, 
+    height: 8, 
+    borderRadius: 4, 
+    backgroundColor: COLORS.error,
+    marginRight: SPACING.sm,
+  },
+  recordingText: { 
+    fontSize: FONT_SIZES.xs, 
+    color: COLORS.error,
+    fontWeight: '600',
+  },
+  transcribingIndicator: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: COLORS.info + '15',
+    padding: SPACING.sm,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+    gap: 8,
+  },
+  transcribingText: { 
+    fontSize: FONT_SIZES.xs, 
+    color: COLORS.info,
+    fontWeight: '600',
+  },
+  voiceHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING.md,
+    gap: 6,
+  },
+  voiceHintText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    flex: 1,
+  },
 });

@@ -15,6 +15,7 @@ import httpx
 import json
 import base64
 import io
+from emergentintegrations.llm.openai import OpenAISpeechToText
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -81,6 +82,14 @@ class CareRecipientOut(BaseModel):
     notes: Optional[str] = None
     caregivers: Optional[List[str]] = []
     created_at: Optional[str] = None
+    profile_photo: Optional[str] = None
+
+class AudioTranscriptionRequest(BaseModel):
+    audio_base64: str
+    language: Optional[str] = "en"
+
+class ProfilePhotoRequest(BaseModel):
+    photo_base64: str
 
 class MedicationCreate(BaseModel):
     name: str
@@ -486,6 +495,68 @@ async def list_caregivers(recipient_id: str, user: dict = Depends(get_current_us
     caregiver_ids = r.get("caregivers", [])
     caregivers = await db.users.find({"user_id": {"$in": caregiver_ids}}, {"_id": 0, "password_hash": 0}).to_list(50)
     return caregivers
+
+@api_router.post("/care-recipients/{recipient_id}/profile-photo")
+async def upload_profile_photo(recipient_id: str, data: ProfilePhotoRequest, user: dict = Depends(get_current_user)):
+    """Upload a profile photo for a care recipient (for identification by PSWs/care team)."""
+    r = await db.care_recipients.find_one({"recipient_id": recipient_id, "caregivers": user["user_id"]})
+    if not r:
+        raise HTTPException(status_code=404, detail="Care recipient not found")
+    
+    # Store the base64 photo (data URI format expected: data:image/jpeg;base64,...)
+    await db.care_recipients.update_one(
+        {"recipient_id": recipient_id},
+        {"$set": {"profile_photo": data.photo_base64}}
+    )
+    return {"message": "Profile photo updated successfully"}
+
+@api_router.delete("/care-recipients/{recipient_id}/profile-photo")
+async def delete_profile_photo(recipient_id: str, user: dict = Depends(get_current_user)):
+    """Remove the profile photo from a care recipient."""
+    r = await db.care_recipients.find_one({"recipient_id": recipient_id, "caregivers": user["user_id"]})
+    if not r:
+        raise HTTPException(status_code=404, detail="Care recipient not found")
+    
+    await db.care_recipients.update_one(
+        {"recipient_id": recipient_id},
+        {"$unset": {"profile_photo": ""}}
+    )
+    return {"message": "Profile photo removed"}
+
+# ======================== AUDIO TRANSCRIPTION (Voice-to-Text) ========================
+
+@api_router.post("/transcribe")
+async def transcribe_audio(data: AudioTranscriptionRequest, user: dict = Depends(get_current_user)):
+    """Convert voice recording to text using OpenAI Whisper API."""
+    try:
+        # Decode base64 audio
+        # Expected format: data:audio/wav;base64,... or just the base64 string
+        audio_data = data.audio_base64
+        if ',' in audio_data:
+            audio_data = audio_data.split(',')[1]
+        
+        audio_bytes = base64.b64decode(audio_data)
+        
+        # Create file-like object
+        audio_file = io.BytesIO(audio_bytes)
+        audio_file.name = "recording.wav"
+        
+        # Initialize STT client
+        stt = OpenAISpeechToText(api_key=EMERGENT_LLM_KEY)
+        
+        # Transcribe
+        response = await stt.transcribe(
+            file=audio_file,
+            model="whisper-1",
+            response_format="json",
+            language=data.language
+        )
+        
+        return {"text": response.text, "success": True}
+    
+    except Exception as e:
+        logger.error(f"Transcription error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
 
 # ======================== MEDICATIONS ROUTES ========================
 

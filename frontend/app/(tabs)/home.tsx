@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -106,22 +106,29 @@ export default function HomeScreen() {
           </View>
         ) : (
           <>
-            {/* Recipient selector */}
+            {/* Recipient selector with profile photos */}
             {recipients.length > 1 && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recipientScroll}>
                 {recipients.map((r: any) => (
                   <TouchableOpacity
                     key={r.recipient_id}
                     testID={`recipient-${r.recipient_id}`}
-                    style={[styles.recipientChip, selectedRecipientId === r.recipient_id && styles.recipientChipActive]}
+                    style={[styles.recipientChipWithPhoto, selectedRecipientId === r.recipient_id && styles.recipientChipActive]}
                     onPress={async () => {
                       setSelectedRecipientId(r.recipient_id);
                       const dash = await api.get(`/dashboard/${r.recipient_id}`);
                       setDashboard(dash);
                     }}
                   >
+                    {r.profile_photo ? (
+                      <Image source={{ uri: r.profile_photo }} style={styles.recipientThumb} />
+                    ) : (
+                      <View style={styles.recipientThumbPlaceholder}>
+                        <Ionicons name="person" size={16} color={COLORS.textSecondary} />
+                      </View>
+                    )}
                     <Text style={[styles.recipientChipText, selectedRecipientId === r.recipient_id && styles.recipientChipTextActive]}>
-                      {r.name}
+                      {r.name.split(' ')[0]}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -133,6 +140,41 @@ export default function HomeScreen() {
                   <Ionicons name="add" size={18} color={COLORS.primary} />
                 </TouchableOpacity>
               </ScrollView>
+            )}
+
+            {/* Single Recipient Card with Photo (when only one recipient) */}
+            {recipients.length === 1 && (
+              <View style={styles.singleRecipientCard}>
+                <TouchableOpacity 
+                  style={styles.recipientPhotoLarge}
+                  onPress={() => router.push('/edit-profile')}
+                >
+                  {recipients[0].profile_photo ? (
+                    <Image source={{ uri: recipients[0].profile_photo }} style={styles.recipientPhotoLargeImg} />
+                  ) : (
+                    <View style={styles.recipientPhotoLargePlaceholder}>
+                      <Ionicons name="person" size={32} color={COLORS.textSecondary} />
+                    </View>
+                  )}
+                  <View style={styles.editBadgeSmall}>
+                    <Ionicons name="camera" size={10} color={COLORS.white} />
+                  </View>
+                </TouchableOpacity>
+                <View style={styles.singleRecipientInfo}>
+                  <Text style={styles.singleRecipientName}>{recipients[0].name}</Text>
+                  {recipients[0].date_of_birth && (
+                    <Text style={styles.singleRecipientDob}>DOB: {recipients[0].date_of_birth}</Text>
+                  )}
+                </View>
+                <TouchableOpacity
+                  testID="add-another-recipient"
+                  style={styles.addAnotherBtn}
+                  onPress={() => router.push('/add-recipient')}
+                >
+                  <Ionicons name="add" size={16} color={COLORS.primary} />
+                  <Text style={styles.addAnotherText}>Add Another</Text>
+                </TouchableOpacity>
+              </View>
             )}
 
             {/* Stats Cards */}
@@ -346,4 +388,64 @@ const styles = StyleSheet.create({
   },
   noteContent: { fontSize: FONT_SIZES.sm, color: COLORS.textPrimary, lineHeight: 20 },
   noteAuthor: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 4, fontStyle: 'italic' },
+  
+  // Profile photo styles for recipient selector
+  recipientChipWithPhoto: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs, borderRadius: RADIUS.full,
+    backgroundColor: COLORS.surface, borderWidth: 1.5, borderColor: COLORS.border, marginRight: SPACING.sm,
+  },
+  recipientThumb: {
+    width: 28, height: 28, borderRadius: 14,
+  },
+  recipientThumbPlaceholder: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: COLORS.primaryLight + '30',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  
+  // Single recipient card with large photo
+  singleRecipientCard: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: SPACING.lg, marginBottom: SPACING.md,
+    padding: SPACING.md, backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.xl,
+    shadowColor: COLORS.cardShadow, shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1, shadowRadius: 6, elevation: 3,
+  },
+  recipientPhotoLarge: {
+    position: 'relative',
+  },
+  recipientPhotoLargeImg: {
+    width: 56, height: 56, borderRadius: 28,
+  },
+  recipientPhotoLargePlaceholder: {
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: COLORS.primaryLight + '30',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  editBadgeSmall: {
+    position: 'absolute', bottom: 0, right: 0,
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: COLORS.surface,
+  },
+  singleRecipientInfo: {
+    flex: 1, marginLeft: SPACING.md,
+  },
+  singleRecipientName: {
+    fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary,
+  },
+  singleRecipientDob: {
+    fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2,
+  },
+  addAnotherBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.full, borderWidth: 1, borderColor: COLORS.primary,
+  },
+  addAnotherText: {
+    fontSize: FONT_SIZES.xs, fontWeight: '600', color: COLORS.primary,
+  },
 });
