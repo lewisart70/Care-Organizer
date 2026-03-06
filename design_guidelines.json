@@ -1,0 +1,121 @@
+{
+  "project_name": "FamilyCare Organizer",
+  "design_philosophy": {
+    "core_identity": "Warm, Inclusive, Secure. A digital companion that feels like a family member, not a hospital administrator.",
+    "emotional_tone": "Comforting, Reliable, Clarity-First.",
+    "target_audience": "Family caregivers (sandwich generation), elderly care recipients, professional aides.",
+    "accessibility_focus": "High contrast, large touch targets (44px+), clear legible fonts, voice-first options."
+  },
+  "tech_stack_guidelines": {
+    "framework": "React Native (Expo)",
+    "styling": "NativeWind (Tailwind CSS for React Native)",
+    "navigation": "expo-router",
+    "icons": "@expo/vector-icons (Feather or MaterialCommunityIcons)",
+    "fonts": "expo-font",
+    "components": "Custom React Native components mimicking Shadcn/UI aesthetics"
+  },
+  "color_palette": {
+    "primary": {
+      "default": "#D97757",
+      "light": "#F2B8A2",
+      "dark": "#B35A3D",
+      "description": "Warm Terracotta - Represents care, warmth, and vitality."
+    },
+    "secondary": {
+      "default": "#5D8C7B",
+      "light": "#A3C7BD",
+      "dark": "#3D5E52",
+      "description": "Sage Green - Calming, natural, stability."
+    },
+    "neutral": {
+      "background": "#FFFDF7",
+      "surface": "#FFFFFF",
+      "border": "#E5E0D6",
+      "text_primary": "#2D2A26",
+      "text_secondary": "#5C5852",
+      "description": "Warm Cream & Stone - Avoids clinical stark white."
+    },
+    "semantic": {
+      "success": "#4A7C59",
+      "warning": "#E8AF30",
+      "error": "#D94A3D",
+      "info": "#4A709C"
+    }
+  },
+  "typography": {
+    "font_family_heading": "Nunito",
+    "font_family_body": "Open Sans",
+    "scale": {
+      "h1": "text-3xl font-bold tracking-tight text-neutral-900",
+      "h2": "text-2xl font-bold text-neutral-800",
+      "h3": "text-xl font-semibold text-neutral-800",
+      "body_lg": "text-lg text-neutral-700 leading-relaxed",
+      "body_base": "text-base text-neutral-600 leading-relaxed",
+      "caption": "text-sm text-neutral-500",
+      "button": "text-base font-bold uppercase tracking-wide"
+    }
+  },
+  "layout_grid": {
+    "spacing_scale": {
+      "xs": 4,
+      "sm": 8,
+      "md": 16,
+      "lg": 24,
+      "xl": 32,
+      "2xl": 48
+    },
+    "container_padding": "p-5",
+    "card_radius": "rounded-2xl",
+    "input_radius": "rounded-xl"
+  },
+  "component_library": {
+    "buttons": {
+      "primary": "bg-primary-default py-4 px-6 rounded-full shadow-md active:opacity-90 flex-row justify-center items-center",
+      "secondary": "bg-secondary-light/20 border-2 border-secondary-default py-3 px-6 rounded-full active:bg-secondary-light/40 flex-row justify-center items-center",
+      "ghost": "py-2 px-4 rounded-lg active:bg-neutral-100",
+      "emergency": "bg-semantic-error py-4 px-8 rounded-full shadow-lg border-2 border-white flex-row justify-center items-center"
+    },
+    "cards": {
+      "base": "bg-white rounded-2xl p-5 shadow-sm border border-neutral-100",
+      "interactive": "bg-white rounded-2xl p-5 shadow-sm border border-neutral-100 active:scale-[0.98] transition-transform",
+      "highlight": "bg-primary-light/10 border-l-4 border-primary-default rounded-r-xl p-4"
+    },
+    "inputs": {
+      "base": "bg-neutral-50 border border-neutral-200 rounded-xl p-4 text-lg text-neutral-900 focus:border-primary-default focus:bg-white",
+      "label": "text-base font-semibold text-neutral-700 mb-2"
+    }
+  },
+  "image_assets": {
+    "hero_family": {
+      "url": "https://images.unsplash.com/photo-1652300353103-490b43ac8366?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzJ8MHwxfHNlYXJjaHwyfHxlbGRlcmx5JTIwc21pbGluZyUyMGNhcmVnaXZlciUyMGhlbHBpbmclMjBwaWxscyUyMGhhbmQlMjBncmFuZHBhcmVudCUyMGdyYW5kY2hpbGR8ZW58MHx8fHwxNzcyODM3ODIyfDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Older woman holding a baby - multigenerational care",
+      "usage": "Login Screen or Home Hero"
+    },
+    "caregiver_support": {
+      "url": "https://images.unsplash.com/photo-1603129473525-4cd6f36fe057?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzJ8MHwxfHNlYXJjaHwzfHxlbGRlcmx5JTIwc21pbGluZyUyMGNhcmVnaXZlciUyMGhlbHBpbmclMjBwaWxscyUyMGhhbmQlMjBncmFuZHBhcmVudCUyMGdyYW5kY2hpbGR8ZW58MHx8fHwxNzcyODM3ODIyfDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Smiling senior woman - Profile placeholder or Success State",
+      "usage": "Profile or Success Modal"
+    },
+    "social_connection": {
+      "url": "https://images.unsplash.com/photo-1727254694944-bc8b7f841ad4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzJ8MHwxfHNlYXJjaHw0fHxlbGRlcmx5JTIwc21pbGluZyUyMGNhcmVnaXZlciUyMGhlbHBpbmclMjBwaWxscyUyMGhhbmQlMjBncmFuZHBhcmVudCUyMGdyYW5kY2hpbGR8ZW58MHx8fHwxNzcyODM3ODIyfDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Man and woman sitting at table - Consultation or planning",
+      "usage": "Care Plan Setup or Consultation"
+    }
+  },
+  "instructions_to_main_agent": [
+    "INSTALL NATIVEWIND: Run 'yarn add nativewind tailwindcss' and 'npx tailwindcss init' immediately.",
+    "CONFIGURE TAILWIND: Add content paths in tailwind.config.js for './app/**/*.{js,jsx,ts,tsx}' and './src/**/*.{js,jsx,ts,tsx}'.",
+    "USE EXPO ROUTER: Ensure file-based routing in /app directory.",
+    "COMPONENT STRUCTURE: Do NOT use Shadcn/UI (it is web only). Build 'Look-alike' components using the classes provided in 'component_library'.",
+    "ACCESSIBILITY: All pressables must have 'accessibilityRole' and 'accessibilityLabel'.",
+    "THEME: Default to Light Mode with the Warm Cream background. Dark mode should use deeply desaturated warm browns (#1a1512), not pure black.",
+    "MOCK DATA: Create robust seed data for 'Medications' and 'Appointments' to visualize the layout effectively."
+  ],
+  "UNIVERSAL_GUIDELINES": [
+    "Do not use generic 'Inter' font.",
+    "Avoid 'Medical Blue' (#007AFF) as primary. Use Terracotta.",
+    "Ensure 44px minimum touch targets.",
+    "Use 'Safe Area Views' for all screens.",
+    "Add 'data-testid' to all interactive elements for testing."
+  ]
+}
