@@ -23,6 +23,8 @@ export default function RootLayout() {
         <Stack.Screen name="nutrition" options={{ presentation: 'card' }} />
         <Stack.Screen name="legal-financial" options={{ presentation: 'card' }} />
         <Stack.Screen name="caregivers" options={{ presentation: 'card' }} />
+        <Stack.Screen name="chat" options={{ presentation: 'card' }} />
+        <Stack.Screen name="export-report" options={{ presentation: 'card' }} />
       </Stack>
     </AuthProvider>
   );

@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, TextInput, Modal, Alert, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, TextInput, Modal, Alert, RefreshControl, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/utils/api';
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../../src/constants/theme';
@@ -18,6 +19,7 @@ export default function NotesTab() {
   const [category, setCategory] = useState('general');
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [photo, setPhoto] = useState<string | null>(null);
 
   const loadNotes = useCallback(async () => {
     if (!selectedRecipientId) { setLoading(false); return; }

@@ -7,6 +7,8 @@ import { useAuth } from '../../src/context/AuthContext';
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../../src/constants/theme';
 
 const menuItems = [
+  { icon: 'chatbubbles', label: 'Care Team Chat', route: '/chat', color: '#27AE60' },
+  { icon: 'download', label: 'Export Report', route: '/export-report', color: '#8E44AD' },
   { icon: 'medical', label: 'Doctors & Specialists', route: '/doctors', color: COLORS.primary },
   { icon: 'call', label: 'Emergency Contacts', route: '/emergency-contacts', color: COLORS.error },
   { icon: 'time', label: 'Daily Routine', route: '/daily-routine', color: COLORS.info },
