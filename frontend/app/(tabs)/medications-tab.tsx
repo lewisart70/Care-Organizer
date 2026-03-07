@@ -17,7 +17,7 @@ export default function MedicationsTab() {
   const [saving, setSaving] = useState(false);
   
   // Pharmacy state
-  const [pharmacyInfo, setPharmacyInfo] = useState<any>({ name: '', address: '', phone: '', fax: '' });
+  const [pharmacyInfo, setPharmacyInfo] = useState<any>({ name: '', address: '', phone: '', fax: '', website: '' });
   const [showPharmacyModal, setShowPharmacyModal] = useState(false);
   const [savingPharmacy, setSavingPharmacy] = useState(false);
   const [pharmacyExpanded, setPharmacyExpanded] = useState(false);
@@ -74,6 +74,16 @@ export default function MedicationsTab() {
   const callPharmacy = () => {
     if (pharmacyInfo.phone) {
       Linking.openURL(`tel:${pharmacyInfo.phone}`);
+    }
+  };
+
+  const openWebsite = () => {
+    if (pharmacyInfo.website) {
+      let url = pharmacyInfo.website;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+      }
+      Linking.openURL(url);
     }
   };
 
@@ -146,6 +156,12 @@ export default function MedicationsTab() {
                 <Ionicons name="print" size={14} color={COLORS.textSecondary} />
                 <Text style={styles.pharmacyDetailText}>Fax: {pharmacyInfo.fax}</Text>
               </View>
+            )}
+            {pharmacyInfo.website && (
+              <TouchableOpacity style={styles.pharmacyDetailRow} onPress={openWebsite}>
+                <Ionicons name="globe" size={14} color={COLORS.info} />
+                <Text style={[styles.pharmacyDetailText, { color: COLORS.info }]}>{pharmacyInfo.website}</Text>
+              </TouchableOpacity>
             )}
           </View>
         )}
@@ -234,6 +250,7 @@ export default function MedicationsTab() {
               { key: 'address', label: 'Address', placeholder: 'Full pharmacy address', icon: 'location' },
               { key: 'phone', label: 'Phone Number', placeholder: 'e.g., 555-123-4567', icon: 'call', kb: 'phone-pad' },
               { key: 'fax', label: 'Fax Number', placeholder: 'e.g., 555-123-4568', icon: 'print', kb: 'phone-pad' },
+              { key: 'website', label: 'Website', placeholder: 'e.g., www.pharmacy.com', icon: 'globe', kb: 'url' },
             ].map(({ key, label, placeholder, icon, kb }) => (
               <View key={key} style={styles.formGroup}>
                 <View style={styles.formLabelRow}>
