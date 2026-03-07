@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, TextInput, Modal, Alert, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, TextInput, Modal, Alert, RefreshControl, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioRecorder, RecordingPresets, setAudioModeAsync } from 'expo-audio';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../src/context/AuthContext';
 import { api } from '../src/utils/api';
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../src/constants/theme';
@@ -41,6 +42,10 @@ export default function AppointmentsScreen() {
   });
   const [saving, setSaving] = useState(false);
   
+  // Date picker state
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  
   // Voice recording state
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -61,13 +66,17 @@ export default function AppointmentsScreen() {
 
   const openAddModal = () => {
     setEditingAppt(null);
-    setForm({ title: '', date: '', time: '', doctor_name: '', location: '', appointment_type: '', category: '', notes: '', blood_pressure: '', weight: '', repeats: false, repeat_frequency: '' });
+    const today = new Date();
+    setSelectedDate(today);
+    setForm({ title: '', date: today.toISOString().split('T')[0], time: '', doctor_name: '', location: '', appointment_type: '', category: '', notes: '', blood_pressure: '', weight: '', repeats: false, repeat_frequency: '' });
     setTranscript('');
     setShowAdd(true);
   };
 
   const openEditModal = (appt: any) => {
     setEditingAppt(appt);
+    const apptDate = appt.date ? new Date(appt.date) : new Date();
+    setSelectedDate(apptDate);
     setForm({
       title: appt.title || '',
       date: appt.date || '',
@@ -84,6 +93,26 @@ export default function AppointmentsScreen() {
     });
     setTranscript('');
     setShowAdd(true);
+  };
+
+  const handleDateChange = (event: any, date?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (date) {
+      setSelectedDate(date);
+      setForm({ ...form, date: date.toISOString().split('T')[0] });
+    }
+  };
+
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return 'Select Date';
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return dateStr;
+    }
   };
 
   const startRecording = async () => {
@@ -338,9 +367,59 @@ export default function AppointmentsScreen() {
               </ScrollView>
             </View>
             
-            {[{ k: 'title', l: 'Title *', p: 'e.g., Cardiology checkup' },{ k: 'date', l: 'Date *', p: 'YYYY-MM-DD' },{ k: 'time', l: 'Time', p: 'e.g., 10:00 AM' },{ k: 'doctor_name', l: 'Doctor/Provider', p: 'Name of doctor or provider' },{ k: 'location', l: 'Location', p: 'Clinic address' }].map(({ k, l, p }) => (
+            {[{ k: 'title', l: 'Title *', p: 'e.g., Cardiology checkup' },{ k: 'time', l: 'Time', p: 'e.g., 10:00 AM' },{ k: 'doctor_name', l: 'Doctor/Provider', p: 'Name of doctor or provider' },{ k: 'location', l: 'Location', p: 'Clinic address' }].map(({ k, l, p }) => (
               <View key={k} style={s.fg}><Text style={s.fl}>{l}</Text><TextInput testID={`appt-${k}`} style={s.fi} placeholder={p} placeholderTextColor={COLORS.border} value={(form as any)[k]} onChangeText={v => setForm({ ...form, [k]: v })} /></View>))}
             
+            {/* Date Picker Section */}
+            <View style={s.fg}>
+              <Text style={s.fl}>Date *</Text>
+              <TouchableOpacity 
+                testID="date-picker-btn"
+                style={s.datePickerBtn}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Ionicons name="calendar" size={20} color={COLORS.primary} />
+                <Text style={[s.datePickerText, !form.date && { color: COLORS.border }]}>
+                  {formatDisplayDate(form.date)}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Date Picker Modal for iOS / Inline for Android */}
+            {showDatePicker && Platform.OS === 'ios' && (
+              <Modal transparent animationType="slide">
+                <View style={s.datePickerOverlay}>
+                  <View style={s.datePickerModal}>
+                    <View style={s.datePickerHeader}>
+                      <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                        <Text style={s.datePickerCancel}>Cancel</Text>
+                      </TouchableOpacity>
+                      <Text style={s.datePickerTitle}>Select Date</Text>
+                      <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                        <Text style={s.datePickerDone}>Done</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <DateTimePicker
+                      value={selectedDate}
+                      mode="date"
+                      display="spinner"
+                      onChange={handleDateChange}
+                      style={{ height: 200 }}
+                    />
+                  </View>
+                </View>
+              </Modal>
+            )}
+            
+            {showDatePicker && Platform.OS === 'android' && (
+              <DateTimePicker
+                value={selectedDate}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+              />
+            )}
             {/* Vitals Section */}
             <View style={s.vitalsSection}>
               <Text style={s.sectionTitle}>Vitals (Optional)</Text>
@@ -749,6 +828,57 @@ const s = StyleSheet.create({
   fl: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textPrimary, marginBottom: SPACING.xs },
   fi: { backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, paddingHorizontal: SPACING.md, height: 48, fontSize: FONT_SIZES.md, color: COLORS.textPrimary },
   textArea: { height: 120, paddingTop: SPACING.md, textAlignVertical: 'top' },
+  
+  // Date picker styles
+  datePickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    paddingHorizontal: SPACING.md,
+    height: 48,
+    gap: SPACING.sm,
+  },
+  datePickerText: {
+    flex: 1,
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textPrimary,
+  },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  datePickerModal: {
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    paddingBottom: SPACING.xl,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  datePickerTitle: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  datePickerCancel: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+  },
+  datePickerDone: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
   
   // Voice section styles
   voiceSection: {
