@@ -244,6 +244,8 @@ class AppointmentCreate(BaseModel):
     reminder: Optional[bool] = True
     blood_pressure: Optional[str] = None  # e.g., "120/80"
     weight: Optional[str] = None  # e.g., "150 lbs"
+    repeats: Optional[bool] = False
+    repeat_frequency: Optional[str] = None  # daily, weekly, monthly
 
 class AppointmentOut(BaseModel):
     appointment_id: str
@@ -259,6 +261,8 @@ class AppointmentOut(BaseModel):
     reminder: Optional[bool] = True
     blood_pressure: Optional[str] = None
     weight: Optional[str] = None
+    repeats: Optional[bool] = False
+    repeat_frequency: Optional[str] = None
 
 class DailyRoutineCreate(BaseModel):
     time_of_day: str

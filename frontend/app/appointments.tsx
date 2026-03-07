@@ -19,6 +19,13 @@ const CATEGORIES = [
   { id: 'other', label: 'Other', icon: 'ellipsis-horizontal', color: COLORS.textSecondary },
 ];
 
+// Repeat frequency options
+const REPEAT_OPTIONS = [
+  { id: 'daily', label: 'Daily', icon: 'today' },
+  { id: 'weekly', label: 'Weekly', icon: 'calendar' },
+  { id: 'monthly', label: 'Monthly', icon: 'calendar-outline' },
+];
+
 export default function AppointmentsScreen() {
   const { selectedRecipientId } = useAuth();
   const router = useRouter();
@@ -29,7 +36,8 @@ export default function AppointmentsScreen() {
   const [form, setForm] = useState({ 
     title: '', date: '', time: '', doctor_name: '', location: '', 
     appointment_type: '', category: '', notes: '', 
-    blood_pressure: '', weight: '' 
+    blood_pressure: '', weight: '',
+    repeats: false, repeat_frequency: ''
   });
   const [saving, setSaving] = useState(false);
   
@@ -53,7 +61,7 @@ export default function AppointmentsScreen() {
 
   const openAddModal = () => {
     setEditingAppt(null);
-    setForm({ title: '', date: '', time: '', doctor_name: '', location: '', appointment_type: '', category: '', notes: '', blood_pressure: '', weight: '' });
+    setForm({ title: '', date: '', time: '', doctor_name: '', location: '', appointment_type: '', category: '', notes: '', blood_pressure: '', weight: '', repeats: false, repeat_frequency: '' });
     setTranscript('');
     setShowAdd(true);
   };
@@ -71,6 +79,8 @@ export default function AppointmentsScreen() {
       notes: appt.notes || '',
       blood_pressure: appt.blood_pressure || '',
       weight: appt.weight || '',
+      repeats: appt.repeats || false,
+      repeat_frequency: appt.repeat_frequency || '',
     });
     setTranscript('');
     setShowAdd(true);
@@ -171,7 +181,7 @@ export default function AppointmentsScreen() {
       }
       setShowAdd(false); 
       setEditingAppt(null);
-      setForm({ title: '', date: '', time: '', doctor_name: '', location: '', appointment_type: '', category: '', notes: '', blood_pressure: '', weight: '' }); 
+      setForm({ title: '', date: '', time: '', doctor_name: '', location: '', appointment_type: '', category: '', notes: '', blood_pressure: '', weight: '', repeats: false, repeat_frequency: '' }); 
       setTranscript('');
       await load(); 
     }
@@ -277,6 +287,14 @@ export default function AppointmentsScreen() {
                   </View>
                 )}
                 
+                {/* Repeat indicator */}
+                {a.repeats && a.repeat_frequency && (
+                  <View style={s.repeatBadge}>
+                    <Ionicons name="repeat" size={12} color={COLORS.info} />
+                    <Text style={s.repeatText}>Repeats {a.repeat_frequency}</Text>
+                  </View>
+                )}
+                
                 {a.notes && <Text style={s.cardNotes} numberOfLines={3}>{a.notes}</Text>}
                 <View style={s.editHint}>
                   <Text style={s.editHintText}>Tap to edit</Text>
@@ -351,6 +369,45 @@ export default function AppointmentsScreen() {
                   />
                 </View>
               </View>
+            </View>
+            
+            {/* Repeat Section */}
+            <View style={s.repeatSection}>
+              <TouchableOpacity 
+                style={s.repeatToggle}
+                onPress={() => setForm({ ...form, repeats: !form.repeats, repeat_frequency: form.repeats ? '' : form.repeat_frequency })}
+              >
+                <Ionicons 
+                  name={form.repeats ? 'checkbox' : 'square-outline'} 
+                  size={24} 
+                  color={form.repeats ? COLORS.info : COLORS.border} 
+                />
+                <View style={s.repeatToggleText}>
+                  <Text style={s.sectionTitle}>Recurring Appointment</Text>
+                  <Text style={s.sectionSubtitle}>This appointment repeats on a schedule</Text>
+                </View>
+              </TouchableOpacity>
+              
+              {form.repeats && (
+                <View style={s.repeatOptions}>
+                  {REPEAT_OPTIONS.map(opt => (
+                    <TouchableOpacity
+                      key={opt.id}
+                      style={[s.repeatOption, form.repeat_frequency === opt.id && s.repeatOptionActive]}
+                      onPress={() => setForm({ ...form, repeat_frequency: opt.id })}
+                    >
+                      <Ionicons 
+                        name={opt.icon as any} 
+                        size={20} 
+                        color={form.repeat_frequency === opt.id ? COLORS.info : COLORS.textSecondary} 
+                      />
+                      <Text style={[s.repeatOptionText, form.repeat_frequency === opt.id && s.repeatOptionTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
             
             {/* Voice Recording Section */}
@@ -547,6 +604,24 @@ const s = StyleSheet.create({
     fontWeight: '600',
   },
   
+  // Repeat badge in card
+  repeatBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.info + '15',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: RADIUS.md,
+    marginTop: SPACING.xs,
+    gap: 4,
+  },
+  repeatText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.info,
+    fontWeight: '600',
+  },
+  
   modal: { flex: 1, backgroundColor: COLORS.background },
   mHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   mTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary },
@@ -620,6 +695,54 @@ const s = StyleSheet.create({
   },
   vitalInputGroup: {
     flex: 1,
+  },
+  
+  // Repeat section in modal
+  repeatSection: {
+    marginBottom: SPACING.md,
+    padding: SPACING.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+  },
+  repeatToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  repeatToggleText: {
+    flex: 1,
+  },
+  repeatOptions: {
+    flexDirection: 'row',
+    marginTop: SPACING.md,
+    gap: SPACING.sm,
+  },
+  repeatOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.background,
+    gap: 4,
+  },
+  repeatOptionActive: {
+    borderColor: COLORS.info,
+    backgroundColor: COLORS.info + '15',
+  },
+  repeatOptionText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  repeatOptionTextActive: {
+    color: COLORS.info,
   },
   
   fg: { marginBottom: SPACING.md }, 
