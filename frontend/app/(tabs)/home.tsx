@@ -280,6 +280,27 @@ export default function HomeScreen() {
                 ))}
               </View>
             )}
+
+            {/* Book Promotion Banner */}
+            <TouchableOpacity 
+              style={styles.bookBanner}
+              onPress={() => router.push('/about-book')}
+            >
+              <Image 
+                source={require('../../assets/images/book-cover.png')}
+                style={styles.bookBannerImage}
+                resizeMode="cover"
+              />
+              <View style={styles.bookBannerContent}>
+                <Text style={styles.bookBannerLabel}>COMPANION BOOK</Text>
+                <Text style={styles.bookBannerTitle}>The Family Care Organizer</Text>
+                <Text style={styles.bookBannerAuthor}>by Sarah Lewis</Text>
+                <View style={styles.bookBannerCta}>
+                  <Text style={styles.bookBannerCtaText}>Learn More</Text>
+                  <Ionicons name="arrow-forward" size={14} color={COLORS.primary} />
+                </View>
+              </View>
+            </TouchableOpacity>
           </>
         )}
       </ScrollView>
@@ -446,5 +467,61 @@ const styles = StyleSheet.create({
   },
   addAnotherText: {
     fontSize: FONT_SIZES.xs, fontWeight: '600', color: COLORS.primary,
+  },
+  
+  // Book promotion banner styles
+  bookBanner: {
+    flexDirection: 'row',
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.xl,
+    padding: SPACING.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.xl,
+    shadowColor: COLORS.cardShadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: COLORS.primary + '20',
+  },
+  bookBannerImage: {
+    width: 70,
+    height: 90,
+    borderRadius: RADIUS.md,
+  },
+  bookBannerContent: {
+    flex: 1,
+    marginLeft: SPACING.md,
+    justifyContent: 'center',
+  },
+  bookBannerLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.primary,
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  bookBannerTitle: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    lineHeight: 18,
+  },
+  bookBannerAuthor: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  bookBannerCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING.xs,
+    gap: 4,
+  },
+  bookBannerCtaText: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
 });
