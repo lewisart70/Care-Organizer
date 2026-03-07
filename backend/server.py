@@ -65,6 +65,8 @@ class CareRecipientCreate(BaseModel):
     insurance_info: Optional[str] = None
     interests: Optional[List[str]] = []
     notes: Optional[str] = None
+    dnr_info: Optional[dict] = None
+    poa_info: Optional[dict] = None
 
 class CareRecipientOut(BaseModel):
     recipient_id: str
@@ -83,6 +85,8 @@ class CareRecipientOut(BaseModel):
     caregivers: Optional[List[str]] = []
     created_at: Optional[str] = None
     profile_photo: Optional[str] = None
+    dnr_info: Optional[dict] = None
+    poa_info: Optional[dict] = None
 
 class AudioTranscriptionRequest(BaseModel):
     audio_base64: str
