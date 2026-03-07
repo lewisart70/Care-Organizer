@@ -16,6 +16,7 @@ export default function EditProfileScreen() {
   const [conditions, setConditions] = useState('');
   const [allergies, setAllergies] = useState('');
   const [interests, setInterests] = useState('');
+  const [favoriteFoods, setFavoriteFoods] = useState('');
 
   useFocusEffect(useCallback(() => {
     if (!selectedRecipientId) { setLoading(false); return; }
@@ -26,6 +27,7 @@ export default function EditProfileScreen() {
         setConditions((data.medical_conditions || []).join(', '));
         setAllergies((data.allergies || []).join(', '));
         setInterests((data.interests || []).join(', '));
+        setFavoriteFoods((data.favorite_foods || []).join(', '));
       } catch (e) { console.error(e); } finally { setLoading(false); }
     })();
   }, [selectedRecipientId]));
@@ -39,6 +41,7 @@ export default function EditProfileScreen() {
         medical_conditions: conditions ? conditions.split(',').map(s => s.trim()).filter(Boolean) : [],
         allergies: allergies ? allergies.split(',').map(s => s.trim()).filter(Boolean) : [],
         interests: interests ? interests.split(',').map(s => s.trim()).filter(Boolean) : [],
+        favorite_foods: favoriteFoods ? favoriteFoods.split(',').map(s => s.trim()).filter(Boolean) : [],
       });
       router.back();
     } catch (e: any) { Alert.alert('Error', e.message); } finally { setSaving(false); }
@@ -56,7 +59,8 @@ export default function EditProfileScreen() {
             <View key={k} style={s.fg}><Text style={s.fl}>{l}</Text><TextInput testID={`edit-${k}`} style={s.fi} placeholder={p} placeholderTextColor={COLORS.border} value={(form as any)[k]} onChangeText={v => setForm({ ...form, [k]: v })} /></View>))}
           <View style={s.fg}><Text style={s.fl}>Medical Conditions</Text><TextInput testID="edit-conditions" style={s.ta} placeholder="Comma-separated" placeholderTextColor={COLORS.border} value={conditions} onChangeText={setConditions} multiline /></View>
           <View style={s.fg}><Text style={s.fl}>Allergies</Text><TextInput testID="edit-allergies" style={s.ta} placeholder="Comma-separated" placeholderTextColor={COLORS.border} value={allergies} onChangeText={setAllergies} multiline /></View>
-          <View style={s.fg}><Text style={s.fl}>Interests</Text><TextInput testID="edit-interests" style={s.ta} placeholder="Comma-separated" placeholderTextColor={COLORS.border} value={interests} onChangeText={setInterests} multiline /></View>
+          <View style={s.fg}><Text style={s.fl}>Interests & Hobbies</Text><TextInput testID="edit-interests" style={s.ta} placeholder="Comma-separated (e.g., Reading, Gardening)" placeholderTextColor={COLORS.border} value={interests} onChangeText={setInterests} multiline /></View>
+          <View style={s.fg}><Text style={s.fl}>Favorite Foods</Text><TextInput testID="edit-favorite-foods" style={s.ta} placeholder="Comma-separated (e.g., Chicken soup, Apple pie)" placeholderTextColor={COLORS.border} value={favoriteFoods} onChangeText={setFavoriteFoods} multiline /></View>
           <View style={s.fg}><Text style={s.fl}>Notes</Text><TextInput testID="edit-notes" style={s.ta} placeholder="Notes" placeholderTextColor={COLORS.border} value={form.notes} onChangeText={v => setForm({ ...form, notes: v })} multiline /></View>
           <View style={{ height: 40 }} />
         </ScrollView>

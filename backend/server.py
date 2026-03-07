@@ -64,6 +64,7 @@ class CareRecipientCreate(BaseModel):
     health_card_number: Optional[str] = None
     insurance_info: Optional[str] = None
     interests: Optional[List[str]] = []
+    favorite_foods: Optional[List[str]] = []
     notes: Optional[str] = None
     dnr_info: Optional[dict] = None
     poa_info: Optional[dict] = None
@@ -81,6 +82,7 @@ class CareRecipientOut(BaseModel):
     health_card_number: Optional[str] = None
     insurance_info: Optional[str] = None
     interests: Optional[List[str]] = []
+    favorite_foods: Optional[List[str]] = []
     notes: Optional[str] = None
     caregivers: Optional[List[str]] = []
     created_at: Optional[str] = None

@@ -20,6 +20,7 @@ export default function AddRecipientScreen() {
   const [conditions, setConditions] = useState('');
   const [allergies, setAllergies] = useState('');
   const [interests, setInterests] = useState('');
+  const [favoriteFoods, setFavoriteFoods] = useState('');
 
   const pickImage = async () => {
     try {
@@ -95,6 +96,7 @@ export default function AddRecipientScreen() {
         medical_conditions: conditions ? conditions.split(',').map(s => s.trim()).filter(Boolean) : [],
         allergies: allergies ? allergies.split(',').map(s => s.trim()).filter(Boolean) : [],
         interests: interests ? interests.split(',').map(s => s.trim()).filter(Boolean) : [],
+        favorite_foods: favoriteFoods ? favoriteFoods.split(',').map(s => s.trim()).filter(Boolean) : [],
       };
       const result = await api.post('/care-recipients', body);
       
@@ -189,6 +191,11 @@ export default function AddRecipientScreen() {
             <Text style={styles.formLabel}>Interests & Hobbies</Text>
             <TextInput testID="recipient-interests" style={styles.textArea} placeholder="Comma-separated (e.g., Reading, Gardening)"
               placeholderTextColor={COLORS.border} value={interests} onChangeText={setInterests} multiline />
+          </View>
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>Favorite Foods</Text>
+            <TextInput testID="recipient-favorite-foods" style={styles.textArea} placeholder="Comma-separated (e.g., Chicken soup, Apple pie)"
+              placeholderTextColor={COLORS.border} value={favoriteFoods} onChangeText={setFavoriteFoods} multiline />
           </View>
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Additional Notes</Text>
