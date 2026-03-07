@@ -295,7 +295,7 @@ export default function AppointmentsScreen() {
                 
                 <Text style={s.cardTitle}>{a.title}</Text>
                 {a.time && <Text style={s.cardSub}><Ionicons name="time-outline" size={14} /> {a.time}</Text>}
-                {a.doctor_name && <Text style={s.cardSub}><Ionicons name="person-outline" size={14} /> Dr. {a.doctor_name}</Text>}
+                {a.doctor_name && <Text style={s.cardSub}><Ionicons name="person-outline" size={14} /> {a.doctor_name}</Text>}
                 {a.location && <Text style={s.cardSub}><Ionicons name="location-outline" size={14} /> {a.location}</Text>}
                 
                 {/* Vitals if recorded */}
