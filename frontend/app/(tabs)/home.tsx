@@ -57,9 +57,9 @@ export default function HomeScreen() {
   const onRefresh = () => { setRefreshing(true); loadData(); };
 
   const quickActions = [
-    { icon: 'medkit', label: 'Medications', color: COLORS.primary, route: '/medications' },
+    { icon: 'medkit', label: 'Meds', color: COLORS.primary, route: '/medications' },
     { icon: 'call', label: 'Emergency', color: COLORS.error, route: '/emergency-contacts' },
-    { icon: 'calendar', label: 'Appointments', color: COLORS.info, route: '/appointments' },
+    { icon: 'calendar', label: 'Appts', color: COLORS.info, route: '/appointments' },
     { icon: 'document-text', label: 'Notes', color: COLORS.secondary, route: '/(tabs)/notes-tab' },
   ];
 
