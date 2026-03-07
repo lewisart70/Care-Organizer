@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../src/context/AuthContext';
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../src/constants/theme';
+import { Logo } from '../src/components/Logo';
 
 export default function LoginScreen() {
   const { user, isLoading, login, loginWithGoogle } = useAuth();
@@ -67,9 +68,7 @@ export default function LoginScreen() {
       >
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.headerSection}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="heart" size={40} color={COLORS.white} />
-            </View>
+            <Logo size={80} />
             <Text style={styles.appTitle}>FamilyCare</Text>
             <Text style={styles.appSubtitle}>Organizer</Text>
             <Text style={styles.tagline}>Caring for your loved ones, together</Text>

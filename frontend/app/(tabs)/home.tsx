@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/utils/api';
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../../src/constants/theme';
+import { LogoSimple } from '../../src/components/Logo';
 
 export default function HomeScreen() {
   const { user, logout, selectedRecipientId, setSelectedRecipientId } = useAuth();
@@ -90,9 +91,7 @@ export default function HomeScreen() {
         {/* No recipients */}
         {recipients.length === 0 ? (
           <View style={styles.emptyCard}>
-            <View style={styles.emptyIconCircle}>
-              <Ionicons name="people" size={36} color={COLORS.primary} />
-            </View>
+            <LogoSimple size={64} />
             <Text style={styles.emptyTitle}>Welcome to FamilyCare!</Text>
             <Text style={styles.emptyText}>Start by adding a care recipient — the person you're caring for.</Text>
             <TouchableOpacity
