@@ -57,10 +57,10 @@ export default function HomeScreen() {
   const onRefresh = () => { setRefreshing(true); loadData(); };
 
   const quickActions = [
-    { icon: 'medkit', label: 'Meds', color: COLORS.primary, route: '/medications' },
-    { icon: 'call', label: 'Emergency', color: COLORS.error, route: '/emergency-contacts' },
-    { icon: 'calendar', label: 'Appts', color: COLORS.info, route: '/appointments' },
-    { icon: 'document-text', label: 'Notes', color: COLORS.secondary, route: '/(tabs)/notes-tab' },
+    { icon: 'medkit', color: COLORS.primary, route: '/medications' },
+    { icon: 'call', color: COLORS.error, route: '/emergency-contacts' },
+    { icon: 'calendar', color: COLORS.secondary, route: '/appointments' },
+    { icon: 'document-text', color: COLORS.info, route: '/(tabs)/notes-tab' },
   ];
 
   if (loading) {
@@ -205,17 +205,16 @@ export default function HomeScreen() {
             {/* Quick Actions */}
             <Text style={styles.sectionTitle}>Quick Actions</Text>
             <View style={styles.actionsRow}>
-              {quickActions.map((a) => (
+              {quickActions.map((a, index) => (
                 <TouchableOpacity
-                  key={a.label}
-                  testID={`quick-action-${a.label.toLowerCase()}`}
+                  key={index}
+                  testID={`quick-action-${index}`}
                   style={styles.actionBtn}
                   onPress={() => router.push(a.route as any)}
                 >
                   <View style={[styles.actionIcon, { backgroundColor: a.color + '15' }]}>
                     <Ionicons name={a.icon as any} size={24} color={a.color} />
                   </View>
-                  <Text style={styles.actionLabel}>{a.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
