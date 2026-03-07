@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -21,6 +22,12 @@ from emergentintegrations.llm.openai import OpenAISpeechToText
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 import resend
 from passlib.context import CryptContext
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -382,6 +389,14 @@ class SavedResourceCreate(BaseModel):
     email: Optional[str] = None
     notes: Optional[str] = None
     location_searched: Optional[str] = None
+
+# ======================== EXPORT REPORT MODELS ========================
+
+class ExportReportRequest(BaseModel):
+    sections: List[str]  # e.g., ["medications", "appointments", "doctors", "routines", "incidents", "notes", "bathing", "emergency_contacts"]
+    time_period: str  # "7_days" or "30_days"
+    delivery_method: str  # "download", "email_self", "email_other"
+    recipient_email: Optional[str] = None  # Required if delivery_method is "email_other"
 
 # ======================== AUTH HELPERS ========================
 
@@ -2044,6 +2059,369 @@ async def delete_saved_resource(resource_id: str, user: dict = Depends(get_curre
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Resource not found")
     return {"message": "Resource removed"}
+
+# ======================== EXPORT REPORT ROUTES ========================
+
+def generate_care_report_pdf(care_recipient: dict, data: dict, sections: List[str], time_period: str) -> bytes:
+    """Generate a professional PDF care report."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
+    
+    # Get styles
+    styles = getSampleStyleSheet()
+    
+    # Custom styles
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        spaceAfter=6,
+        textColor=colors.HexColor('#D97757'),
+        alignment=TA_CENTER
+    )
+    
+    subtitle_style = ParagraphStyle(
+        'CustomSubtitle',
+        parent=styles['Normal'],
+        fontSize=12,
+        textColor=colors.HexColor('#666666'),
+        alignment=TA_CENTER,
+        spaceAfter=20
+    )
+    
+    section_header_style = ParagraphStyle(
+        'SectionHeader',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.HexColor('#2C3E50'),
+        spaceBefore=15,
+        spaceAfter=10,
+        borderPadding=5
+    )
+    
+    normal_style = ParagraphStyle(
+        'CustomNormal',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.HexColor('#333333'),
+        spaceAfter=6
+    )
+    
+    story = []
+    
+    # Header
+    story.append(Paragraph("Family Care Organizer", title_style))
+    story.append(Paragraph("Care Summary Report", subtitle_style))
+    story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor('#D97757')))
+    story.append(Spacer(1, 12))
+    
+    # Care Recipient Info
+    recipient_name = care_recipient.get('name', 'Unknown')
+    period_text = "Last 7 Days" if time_period == "7_days" else "Last 30 Days"
+    report_date = datetime.now().strftime("%B %d, %Y")
+    
+    info_data = [
+        ["Care Recipient:", recipient_name],
+        ["Report Period:", period_text],
+        ["Generated:", report_date]
+    ]
+    
+    info_table = Table(info_data, colWidths=[1.5*inch, 4*inch])
+    info_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#666666')),
+        ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#333333')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(info_table)
+    story.append(Spacer(1, 20))
+    
+    # Helper function to format dates
+    def format_date(date_str):
+        if not date_str:
+            return "N/A"
+        try:
+            dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            return dt.strftime("%b %d, %Y %I:%M %p")
+        except:
+            return date_str
+    
+    # Medications Section
+    if "medications" in sections and data.get("medications"):
+        story.append(Paragraph("Medications", section_header_style))
+        meds = data["medications"]
+        for med in meds:
+            med_text = f"<b>{med.get('name', 'Unknown')}</b> - {med.get('dosage', '')} | {med.get('frequency', '')} | {med.get('time_of_day', '')}"
+            if med.get('notes'):
+                med_text += f"<br/><i>Notes: {med.get('notes')}</i>"
+            story.append(Paragraph(med_text, normal_style))
+        story.append(Spacer(1, 10))
+    
+    # Appointments Section
+    if "appointments" in sections and data.get("appointments"):
+        story.append(Paragraph("Appointments", section_header_style))
+        for appt in data["appointments"]:
+            appt_text = f"<b>{appt.get('title', 'Appointment')}</b> - {appt.get('date', '')} at {appt.get('time', '')}"
+            if appt.get('doctor_name'):
+                appt_text += f" with {appt.get('doctor_name')}"
+            if appt.get('location'):
+                appt_text += f"<br/>Location: {appt.get('location')}"
+            story.append(Paragraph(appt_text, normal_style))
+        story.append(Spacer(1, 10))
+    
+    # Doctors Section
+    if "doctors" in sections and data.get("doctors"):
+        story.append(Paragraph("Doctors & Specialists", section_header_style))
+        for doc in data["doctors"]:
+            doc_text = f"<b>{doc.get('name', 'Unknown')}</b> - {doc.get('specialty', '')}"
+            if doc.get('phone'):
+                doc_text += f"<br/>Phone: {doc.get('phone')}"
+            if doc.get('address'):
+                doc_text += f"<br/>Address: {doc.get('address')}"
+            story.append(Paragraph(doc_text, normal_style))
+        story.append(Spacer(1, 10))
+    
+    # Daily Routines Section
+    if "routines" in sections and data.get("routines"):
+        story.append(Paragraph("Daily Routines", section_header_style))
+        for routine in data["routines"]:
+            routine_text = f"<b>{routine.get('time', '')} - {routine.get('activity', '')}</b>"
+            if routine.get('notes'):
+                routine_text += f"<br/><i>{routine.get('notes')}</i>"
+            story.append(Paragraph(routine_text, normal_style))
+        story.append(Spacer(1, 10))
+    
+    # Incidents Section
+    if "incidents" in sections and data.get("incidents"):
+        story.append(Paragraph("Incidents & Falls", section_header_style))
+        for incident in data["incidents"]:
+            severity_color = "#E74C3C" if incident.get('severity') == 'severe' else "#F39C12" if incident.get('severity') == 'moderate' else "#27AE60"
+            incident_text = f"<b>{incident.get('incident_type', '').title()}</b> ({incident.get('severity', '').title()}) - {format_date(incident.get('created_at'))}"
+            incident_text += f"<br/>{incident.get('description', '')}"
+            if incident.get('action_taken'):
+                incident_text += f"<br/><i>Action: {incident.get('action_taken')}</i>"
+            story.append(Paragraph(incident_text, normal_style))
+        story.append(Spacer(1, 10))
+    
+    # Notes Section
+    if "notes" in sections and data.get("notes"):
+        story.append(Paragraph("Caregiver Notes", section_header_style))
+        for note in data["notes"]:
+            note_text = f"<b>{note.get('category', 'General').title()}</b> - {format_date(note.get('created_at'))}"
+            note_text += f"<br/>{note.get('content', '')}"
+            note_text += f"<br/><i>By: {note.get('author_name', 'Unknown')}</i>"
+            story.append(Paragraph(note_text, normal_style))
+        story.append(Spacer(1, 10))
+    
+    # Bathing Section
+    if "bathing" in sections and data.get("bathing"):
+        story.append(Paragraph("Bathing Records", section_header_style))
+        for bath in data["bathing"]:
+            bath_text = f"<b>{bath.get('bath_date', '')}</b> - {bath.get('bath_type', '').title()}"
+            if bath.get('assisted_by'):
+                bath_text += f" (Assisted by: {bath.get('assisted_by')})"
+            if bath.get('notes'):
+                bath_text += f"<br/><i>{bath.get('notes')}</i>"
+            story.append(Paragraph(bath_text, normal_style))
+        story.append(Spacer(1, 10))
+    
+    # Emergency Contacts Section
+    if "emergency_contacts" in sections and data.get("emergency_contacts"):
+        story.append(Paragraph("Emergency Contacts", section_header_style))
+        for contact in data["emergency_contacts"]:
+            contact_text = f"<b>{contact.get('name', 'Unknown')}</b> - {contact.get('relationship', '')}"
+            contact_text += f"<br/>Phone: {contact.get('phone', 'N/A')}"
+            if contact.get('email'):
+                contact_text += f" | Email: {contact.get('email')}"
+            story.append(Paragraph(contact_text, normal_style))
+        story.append(Spacer(1, 10))
+    
+    # Footer
+    story.append(Spacer(1, 30))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#CCCCCC')))
+    footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#999999'), alignment=TA_CENTER)
+    story.append(Paragraph(f"Generated by Family Care Organizer | {report_date}", footer_style))
+    story.append(Paragraph("This report is confidential and intended for authorized caregivers only.", footer_style))
+    
+    # Build PDF
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+@api_router.post("/care-recipients/{recipient_id}/export-report")
+async def export_care_report(
+    recipient_id: str, 
+    data: ExportReportRequest, 
+    user: dict = Depends(get_current_user)
+):
+    """Generate and optionally email a care report PDF."""
+    
+    # Get care recipient
+    care_recipient = await db.care_recipients.find_one(
+        {"recipient_id": recipient_id, "caregivers": user["user_id"]},
+        {"_id": 0}
+    )
+    if not care_recipient:
+        raise HTTPException(status_code=404, detail="Care recipient not found")
+    
+    # Calculate date filter
+    if data.time_period == "7_days":
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=7)
+    else:
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
+    
+    cutoff_str = cutoff_date.isoformat()
+    
+    # Gather data for each section
+    report_data = {}
+    
+    if "medications" in data.sections:
+        report_data["medications"] = await db.medications.find(
+            {"recipient_id": recipient_id}, {"_id": 0}
+        ).to_list(100)
+    
+    if "appointments" in data.sections:
+        report_data["appointments"] = await db.appointments.find(
+            {"recipient_id": recipient_id}, {"_id": 0}
+        ).sort("date", -1).to_list(50)
+    
+    if "doctors" in data.sections:
+        report_data["doctors"] = await db.doctors.find(
+            {"recipient_id": recipient_id}, {"_id": 0}
+        ).to_list(50)
+    
+    if "routines" in data.sections:
+        report_data["routines"] = await db.routines.find(
+            {"recipient_id": recipient_id}, {"_id": 0}
+        ).to_list(50)
+    
+    if "incidents" in data.sections:
+        report_data["incidents"] = await db.incidents.find(
+            {"recipient_id": recipient_id, "created_at": {"$gte": cutoff_str}}, {"_id": 0}
+        ).sort("created_at", -1).to_list(50)
+    
+    if "notes" in data.sections:
+        report_data["notes"] = await db.notes.find(
+            {"recipient_id": recipient_id, "created_at": {"$gte": cutoff_str}}, {"_id": 0}
+        ).sort("created_at", -1).to_list(50)
+    
+    if "bathing" in data.sections:
+        report_data["bathing"] = await db.bathing.find(
+            {"recipient_id": recipient_id}, {"_id": 0}
+        ).sort("bath_date", -1).to_list(50)
+    
+    if "emergency_contacts" in data.sections:
+        report_data["emergency_contacts"] = await db.emergency_contacts.find(
+            {"recipient_id": recipient_id}, {"_id": 0}
+        ).to_list(20)
+    
+    # Generate PDF
+    pdf_bytes = generate_care_report_pdf(care_recipient, report_data, data.sections, data.time_period)
+    
+    # Handle delivery method
+    if data.delivery_method == "download":
+        # Return PDF for download
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename=care_report_{recipient_id}_{datetime.now().strftime('%Y%m%d')}.pdf"
+            }
+        )
+    
+    elif data.delivery_method in ["email_self", "email_other"]:
+        # Determine recipient email
+        if data.delivery_method == "email_self":
+            recipient_email = user.get("email")
+            if not recipient_email:
+                raise HTTPException(status_code=400, detail="User email not found")
+        else:
+            recipient_email = data.recipient_email
+            if not recipient_email:
+                raise HTTPException(status_code=400, detail="Recipient email is required")
+        
+        # Send email with PDF attachment
+        if not RESEND_API_KEY:
+            raise HTTPException(status_code=500, detail="Email service not configured")
+        
+        resend.api_key = RESEND_API_KEY
+        
+        try:
+            care_name = care_recipient.get('name', 'Care Recipient')
+            period_text = "Last 7 Days" if data.time_period == "7_days" else "Last 30 Days"
+            
+            email_response = resend.Emails.send({
+                "from": SENDER_EMAIL,
+                "to": recipient_email,
+                "subject": f"Care Report for {care_name} - {period_text}",
+                "html": f"""
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <div style="background-color: #D97757; padding: 20px; text-align: center;">
+                        <h1 style="color: white; margin: 0;">Family Care Organizer</h1>
+                    </div>
+                    <div style="padding: 30px; background-color: #f9f9f9;">
+                        <h2 style="color: #2C3E50;">Care Report</h2>
+                        <p>Hello,</p>
+                        <p>Please find attached the care report for <strong>{care_name}</strong>.</p>
+                        <p><strong>Report Period:</strong> {period_text}</p>
+                        <p><strong>Generated:</strong> {datetime.now().strftime("%B %d, %Y")}</p>
+                        <p>This report includes the following sections:</p>
+                        <ul>
+                            {"".join([f"<li>{s.replace('_', ' ').title()}</li>" for s in data.sections])}
+                        </ul>
+                        <hr style="border: 1px solid #eee; margin: 20px 0;">
+                        <p style="color: #666; font-size: 12px;">
+                            This is a confidential document generated by Family Care Organizer. 
+                            Please handle with care and share only with authorized individuals.
+                        </p>
+                    </div>
+                </div>
+                """,
+                "attachments": [
+                    {
+                        "filename": f"care_report_{care_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                        "content": base64.b64encode(pdf_bytes).decode('utf-8')
+                    }
+                ]
+            })
+            
+            return {
+                "success": True,
+                "message": f"Report sent successfully to {recipient_email}",
+                "email_id": email_response.get("id")
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to send report email: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+    
+    else:
+        raise HTTPException(status_code=400, detail="Invalid delivery method")
+
+@api_router.get("/care-recipients/{recipient_id}/export-sections")
+async def get_export_sections(recipient_id: str, user: dict = Depends(get_current_user)):
+    """Get available sections for export with counts."""
+    
+    # Verify access
+    care_recipient = await db.care_recipients.find_one(
+        {"recipient_id": recipient_id, "caregivers": user["user_id"]}
+    )
+    if not care_recipient:
+        raise HTTPException(status_code=404, detail="Care recipient not found")
+    
+    sections = [
+        {"id": "medications", "name": "Medications", "icon": "medical"},
+        {"id": "appointments", "name": "Appointments", "icon": "calendar"},
+        {"id": "doctors", "name": "Doctors & Specialists", "icon": "person"},
+        {"id": "routines", "name": "Daily Routines", "icon": "time"},
+        {"id": "incidents", "name": "Incidents & Falls", "icon": "alert-circle"},
+        {"id": "notes", "name": "Caregiver Notes", "icon": "document-text"},
+        {"id": "bathing", "name": "Bathing Records", "icon": "water"},
+        {"id": "emergency_contacts", "name": "Emergency Contacts", "icon": "call"}
+    ]
+    
+    return {"sections": sections}
 
 # ======================== SETUP ========================
 

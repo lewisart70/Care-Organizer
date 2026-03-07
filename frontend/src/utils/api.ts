@@ -2,9 +2,19 @@ const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
 class ApiClient {
   private token: string | null = null;
+  
+  // Expose base URL for direct fetch calls
+  get baseUrl(): string {
+    return `${BACKEND_URL}/api`;
+  }
 
   setToken(token: string | null) {
     this.token = token;
+  }
+  
+  // Get current token for direct fetch calls
+  getToken(): string | null {
+    return this.token;
   }
 
   private getHeaders(): Record<string, string> {
