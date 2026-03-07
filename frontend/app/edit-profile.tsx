@@ -12,7 +12,11 @@ export default function EditProfileScreen() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ name: '', date_of_birth: '', gender: '', address: '', phone: '', blood_type: '', health_card_number: '', insurance_info: '', notes: '' });
+  const [form, setForm] = useState({ 
+    name: '', date_of_birth: '', gender: '', address: '', phone: '', 
+    blood_type: '', weight: '', blood_pressure: '', blood_pressure_date: '',
+    health_card_number: '', insurance_info: '', notes: '' 
+  });
   const [conditions, setConditions] = useState('');
   const [allergies, setAllergies] = useState('');
   const [interests, setInterests] = useState('');
@@ -23,7 +27,14 @@ export default function EditProfileScreen() {
     (async () => {
       try {
         const data = await api.get(`/care-recipients/${selectedRecipientId}`);
-        setForm({ name: data.name || '', date_of_birth: data.date_of_birth || '', gender: data.gender || '', address: data.address || '', phone: data.phone || '', blood_type: data.blood_type || '', health_card_number: data.health_card_number || '', insurance_info: data.insurance_info || '', notes: data.notes || '' });
+        setForm({ 
+          name: data.name || '', date_of_birth: data.date_of_birth || '', 
+          gender: data.gender || '', address: data.address || '', phone: data.phone || '', 
+          blood_type: data.blood_type || '', weight: data.weight || '',
+          blood_pressure: data.blood_pressure || '', blood_pressure_date: data.blood_pressure_date || '',
+          health_card_number: data.health_card_number || '', insurance_info: data.insurance_info || '', 
+          notes: data.notes || '' 
+        });
         setConditions((data.medical_conditions || []).join(', '));
         setAllergies((data.allergies || []).join(', '));
         setInterests((data.interests || []).join(', '));
@@ -55,8 +66,22 @@ export default function EditProfileScreen() {
         <View style={s.header}><TouchableOpacity testID="close-edit" onPress={() => router.back()}><Ionicons name="close" size={28} color={COLORS.textPrimary} /></TouchableOpacity><Text style={s.headerTitle}>Edit Profile</Text>
           <TouchableOpacity testID="save-edit-btn" onPress={handleSave} disabled={saving}>{saving ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Text style={s.saveText}>Save</Text>}</TouchableOpacity></View>
         <ScrollView style={s.body} keyboardShouldPersistTaps="handled">
-          {[{ k: 'name', l: 'Full Name *', p: 'Name' },{ k: 'date_of_birth', l: 'Date of Birth', p: 'YYYY-MM-DD' },{ k: 'gender', l: 'Gender', p: 'Gender' },{ k: 'phone', l: 'Phone', p: 'Phone' },{ k: 'address', l: 'Address', p: 'Address' },{ k: 'blood_type', l: 'Blood Type', p: 'e.g., O+' },{ k: 'health_card_number', l: 'Health Card #', p: 'Number' },{ k: 'insurance_info', l: 'Insurance', p: 'Insurance info' }].map(({ k, l, p }) => (
+          {[{ k: 'name', l: 'Full Name *', p: 'Name' },{ k: 'date_of_birth', l: 'Date of Birth', p: 'YYYY-MM-DD' },{ k: 'gender', l: 'Gender', p: 'Gender' },{ k: 'phone', l: 'Phone', p: 'Phone' },{ k: 'address', l: 'Address', p: 'Address' },{ k: 'blood_type', l: 'Blood Type', p: 'e.g., O+' },{ k: 'weight', l: 'Weight', p: 'e.g., 150 lbs' },{ k: 'health_card_number', l: 'Health Card #', p: 'Number' },{ k: 'insurance_info', l: 'Insurance', p: 'Insurance info' }].map(({ k, l, p }) => (
             <View key={k} style={s.fg}><Text style={s.fl}>{l}</Text><TextInput testID={`edit-${k}`} style={s.fi} placeholder={p} placeholderTextColor={COLORS.border} value={(form as any)[k]} onChangeText={v => setForm({ ...form, [k]: v })} /></View>))}
+          
+          {/* Blood Pressure Section */}
+          <View style={s.sectionHeader}><Ionicons name="heart" size={18} color={COLORS.error} /><Text style={s.sectionTitle}>Blood Pressure</Text></View>
+          <View style={s.rowFields}>
+            <View style={[s.fg, { flex: 1, marginRight: SPACING.sm }]}>
+              <Text style={s.fl}>Reading</Text>
+              <TextInput testID="edit-blood_pressure" style={s.fi} placeholder="e.g., 120/80" placeholderTextColor={COLORS.border} value={form.blood_pressure} onChangeText={v => setForm({ ...form, blood_pressure: v })} />
+            </View>
+            <View style={[s.fg, { flex: 1 }]}>
+              <Text style={s.fl}>Date Taken</Text>
+              <TextInput testID="edit-blood_pressure_date" style={s.fi} placeholder="YYYY-MM-DD" placeholderTextColor={COLORS.border} value={form.blood_pressure_date} onChangeText={v => setForm({ ...form, blood_pressure_date: v })} />
+            </View>
+          </View>
+
           <View style={s.fg}><Text style={s.fl}>Medical Conditions</Text><TextInput testID="edit-conditions" style={s.ta} placeholder="Comma-separated" placeholderTextColor={COLORS.border} value={conditions} onChangeText={setConditions} multiline /></View>
           <View style={s.fg}><Text style={s.fl}>Allergies</Text><TextInput testID="edit-allergies" style={s.ta} placeholder="Comma-separated" placeholderTextColor={COLORS.border} value={allergies} onChangeText={setAllergies} multiline /></View>
           <View style={s.fg}><Text style={s.fl}>Interests & Hobbies</Text><TextInput testID="edit-interests" style={s.ta} placeholder="Comma-separated (e.g., Reading, Gardening)" placeholderTextColor={COLORS.border} value={interests} onChangeText={setInterests} multiline /></View>
@@ -76,4 +101,7 @@ const s = StyleSheet.create({
   fg: { marginBottom: SPACING.md }, fl: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textPrimary, marginBottom: SPACING.xs },
   fi: { backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, paddingHorizontal: SPACING.md, height: 48, fontSize: FONT_SIZES.md, color: COLORS.textPrimary },
   ta: { backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, padding: SPACING.md, fontSize: FONT_SIZES.md, color: COLORS.textPrimary, minHeight: 60 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginTop: SPACING.sm, marginBottom: SPACING.md, paddingBottom: SPACING.xs, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  sectionTitle: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary, marginLeft: SPACING.sm },
+  rowFields: { flexDirection: 'row' },
 });

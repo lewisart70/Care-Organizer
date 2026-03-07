@@ -15,7 +15,8 @@ export default function AddRecipientScreen() {
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '', date_of_birth: '', gender: '', address: '', phone: '',
-    blood_type: '', health_card_number: '', insurance_info: '', notes: '',
+    blood_type: '', weight: '', blood_pressure: '', blood_pressure_date: '',
+    health_card_number: '', insurance_info: '', notes: '',
   });
   const [conditions, setConditions] = useState('');
   const [allergies, setAllergies] = useState('');
@@ -125,6 +126,7 @@ export default function AddRecipientScreen() {
     { key: 'phone', label: 'Phone', placeholder: 'Phone number', icon: 'call' },
     { key: 'address', label: 'Address', placeholder: 'Home address', icon: 'location' },
     { key: 'blood_type', label: 'Blood Type', placeholder: 'e.g., O+', icon: 'water' },
+    { key: 'weight', label: 'Weight', placeholder: 'e.g., 150 lbs', icon: 'fitness' },
     { key: 'health_card_number', label: 'Health Card Number', placeholder: 'Health card #', icon: 'card' },
     { key: 'insurance_info', label: 'Insurance Info', placeholder: 'Insurance details', icon: 'shield-checkmark' },
   ];
@@ -177,6 +179,27 @@ export default function AddRecipientScreen() {
               </View>
             </View>
           ))}
+          
+          {/* Blood Pressure Section */}
+          <View style={styles.sectionHeader}>
+            <Ionicons name="heart" size={18} color={COLORS.error} />
+            <Text style={styles.sectionTitle}>Blood Pressure</Text>
+          </View>
+          <View style={styles.rowFields}>
+            <View style={[styles.formGroup, { flex: 1, marginRight: SPACING.sm }]}>
+              <Text style={styles.formLabel}>Reading</Text>
+              <TextInput testID="recipient-blood_pressure" style={styles.input} placeholder="e.g., 120/80"
+                placeholderTextColor={COLORS.border} value={form.blood_pressure}
+                onChangeText={(v) => setForm({ ...form, blood_pressure: v })} />
+            </View>
+            <View style={[styles.formGroup, { flex: 1 }]}>
+              <Text style={styles.formLabel}>Date Taken</Text>
+              <TextInput testID="recipient-blood_pressure_date" style={styles.input} placeholder="YYYY-MM-DD"
+                placeholderTextColor={COLORS.border} value={form.blood_pressure_date}
+                onChangeText={(v) => setForm({ ...form, blood_pressure_date: v })} />
+            </View>
+          </View>
+          
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Medical Conditions</Text>
             <TextInput testID="recipient-conditions" style={styles.textArea} placeholder="Comma-separated (e.g., Diabetes, Hypertension)"
@@ -270,6 +293,9 @@ const styles = StyleSheet.create({
   formLabel: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textPrimary, marginBottom: SPACING.xs },
   inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, paddingHorizontal: SPACING.md, height: 48 },
   inputIcon: { marginRight: SPACING.sm },
-  input: { flex: 1, fontSize: FONT_SIZES.md, color: COLORS.textPrimary },
+  input: { flex: 1, fontSize: FONT_SIZES.md, color: COLORS.textPrimary, backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, paddingHorizontal: SPACING.md, height: 48 },
   textArea: { backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, padding: SPACING.md, fontSize: FONT_SIZES.md, color: COLORS.textPrimary, minHeight: 60 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginTop: SPACING.md, marginBottom: SPACING.md, paddingBottom: SPACING.xs, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  sectionTitle: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary, marginLeft: SPACING.sm },
+  rowFields: { flexDirection: 'row' },
 });

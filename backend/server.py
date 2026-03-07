@@ -61,6 +61,9 @@ class CareRecipientCreate(BaseModel):
     medical_conditions: Optional[List[str]] = []
     allergies: Optional[List[str]] = []
     blood_type: Optional[str] = None
+    weight: Optional[str] = None
+    blood_pressure: Optional[str] = None
+    blood_pressure_date: Optional[str] = None
     health_card_number: Optional[str] = None
     insurance_info: Optional[str] = None
     interests: Optional[List[str]] = []
@@ -79,6 +82,9 @@ class CareRecipientOut(BaseModel):
     medical_conditions: Optional[List[str]] = []
     allergies: Optional[List[str]] = []
     blood_type: Optional[str] = None
+    weight: Optional[str] = None
+    blood_pressure: Optional[str] = None
+    blood_pressure_date: Optional[str] = None
     health_card_number: Optional[str] = None
     insurance_info: Optional[str] = None
     interests: Optional[List[str]] = []
