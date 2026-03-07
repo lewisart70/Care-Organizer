@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, TextInput, Modal, Alert, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, TextInput, Modal, Alert, RefreshControl, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,12 +15,24 @@ export default function MedicationsTab() {
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: '', dosage: '', frequency: '', time_of_day: '', instructions: '', prescribing_doctor: '' });
   const [saving, setSaving] = useState(false);
+  
+  // Pharmacy state
+  const [pharmacyInfo, setPharmacyInfo] = useState<any>({ name: '', address: '', phone: '', fax: '' });
+  const [showPharmacyModal, setShowPharmacyModal] = useState(false);
+  const [savingPharmacy, setSavingPharmacy] = useState(false);
+  const [pharmacyExpanded, setPharmacyExpanded] = useState(false);
 
   const loadMeds = useCallback(async () => {
     if (!selectedRecipientId) { setLoading(false); return; }
     try {
-      const data = await api.get(`/care-recipients/${selectedRecipientId}/medications`);
-      setMeds(data);
+      const [medsData, recipientData] = await Promise.all([
+        api.get(`/care-recipients/${selectedRecipientId}/medications`),
+        api.get(`/care-recipients/${selectedRecipientId}`)
+      ]);
+      setMeds(medsData);
+      if (recipientData.pharmacy_info) {
+        setPharmacyInfo(recipientData.pharmacy_info);
+      }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   }, [selectedRecipientId]);
@@ -49,6 +61,24 @@ export default function MedicationsTab() {
     } catch (e: any) { Alert.alert('Error', e.message); }
   };
 
+  const savePharmacy = async () => {
+    setSavingPharmacy(true);
+    try {
+      await api.patch(`/care-recipients/${selectedRecipientId}`, { pharmacy_info: pharmacyInfo });
+      setShowPharmacyModal(false);
+      Alert.alert('Saved', 'Pharmacy information updated');
+    } catch (e: any) { Alert.alert('Error', e.message); }
+    finally { setSavingPharmacy(false); }
+  };
+
+  const callPharmacy = () => {
+    if (pharmacyInfo.phone) {
+      Linking.openURL(`tel:${pharmacyInfo.phone}`);
+    }
+  };
+
+  const hasPharmacyInfo = pharmacyInfo.name || pharmacyInfo.phone;
+
   if (!selectedRecipientId) {
     return <SafeAreaView style={styles.container}><View style={styles.centered}><Text style={styles.emptyText}>Select a care recipient first</Text></View></SafeAreaView>;
   }
@@ -69,6 +99,56 @@ export default function MedicationsTab() {
           <Text style={styles.aiCheckerText}>AI Medication Interaction Checker</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
+      </TouchableOpacity>
+
+      {/* Pharmacy Card */}
+      <TouchableOpacity 
+        style={styles.pharmacyCard} 
+        onPress={() => setPharmacyExpanded(!pharmacyExpanded)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.pharmacyHeader}>
+          <View style={styles.pharmacyIcon}>
+            <Ionicons name="storefront" size={20} color={COLORS.info} />
+          </View>
+          <View style={styles.pharmacyHeaderText}>
+            <Text style={styles.pharmacyTitle}>Pharmacy</Text>
+            {hasPharmacyInfo ? (
+              <Text style={styles.pharmacyName}>{pharmacyInfo.name || 'Tap to view'}</Text>
+            ) : (
+              <Text style={styles.pharmacyEmpty}>Add pharmacy information</Text>
+            )}
+          </View>
+          <View style={styles.pharmacyActions}>
+            <TouchableOpacity style={styles.pharmacyEditBtn} onPress={() => setShowPharmacyModal(true)}>
+              <Ionicons name="pencil" size={16} color={COLORS.info} />
+            </TouchableOpacity>
+            <Ionicons name={pharmacyExpanded ? "chevron-up" : "chevron-down"} size={20} color={COLORS.textSecondary} />
+          </View>
+        </View>
+        
+        {pharmacyExpanded && hasPharmacyInfo && (
+          <View style={styles.pharmacyDetails}>
+            {pharmacyInfo.address && (
+              <View style={styles.pharmacyDetailRow}>
+                <Ionicons name="location" size={14} color={COLORS.textSecondary} />
+                <Text style={styles.pharmacyDetailText}>{pharmacyInfo.address}</Text>
+              </View>
+            )}
+            {pharmacyInfo.phone && (
+              <TouchableOpacity style={styles.pharmacyDetailRow} onPress={callPharmacy}>
+                <Ionicons name="call" size={14} color={COLORS.primary} />
+                <Text style={[styles.pharmacyDetailText, { color: COLORS.primary }]}>{pharmacyInfo.phone}</Text>
+              </TouchableOpacity>
+            )}
+            {pharmacyInfo.fax && (
+              <View style={styles.pharmacyDetailRow}>
+                <Ionicons name="print" size={14} color={COLORS.textSecondary} />
+                <Text style={styles.pharmacyDetailText}>Fax: {pharmacyInfo.fax}</Text>
+              </View>
+            )}
+          </View>
+        )}
       </TouchableOpacity>
 
       <ScrollView refreshControl={<RefreshControl refreshing={false} onRefresh={loadMeds} tintColor={COLORS.primary} />}>
@@ -131,6 +211,48 @@ export default function MedicationsTab() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+      
+      {/* Pharmacy Edit Modal */}
+      <Modal visible={showPharmacyModal} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowPharmacyModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
+            <Text style={styles.modalTitle}>Pharmacy Info</Text>
+            <TouchableOpacity onPress={savePharmacy} disabled={savingPharmacy}>
+              {savingPharmacy ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Text style={styles.saveText}>Save</Text>}
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.modalBody}>
+            <View style={styles.pharmacyTip}>
+              <Ionicons name="information-circle" size={18} color={COLORS.info} />
+              <Text style={styles.pharmacyTipText}>
+                Keep pharmacy details handy for refills and prescription transfers
+              </Text>
+            </View>
+            {[
+              { key: 'name', label: 'Pharmacy Name', placeholder: 'e.g., Shoppers Drug Mart', icon: 'storefront' },
+              { key: 'address', label: 'Address', placeholder: 'Full pharmacy address', icon: 'location' },
+              { key: 'phone', label: 'Phone Number', placeholder: 'e.g., 555-123-4567', icon: 'call', kb: 'phone-pad' },
+              { key: 'fax', label: 'Fax Number', placeholder: 'e.g., 555-123-4568', icon: 'print', kb: 'phone-pad' },
+            ].map(({ key, label, placeholder, icon, kb }) => (
+              <View key={key} style={styles.formGroup}>
+                <View style={styles.formLabelRow}>
+                  <Ionicons name={icon as any} size={16} color={COLORS.textSecondary} />
+                  <Text style={styles.formLabel}>{label}</Text>
+                </View>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder={placeholder}
+                  placeholderTextColor={COLORS.border}
+                  value={(pharmacyInfo as any)[key] || ''}
+                  onChangeText={(v) => setPharmacyInfo({ ...pharmacyInfo, [key]: v })}
+                  keyboardType={(kb as any) || 'default'}
+                />
+              </View>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -158,7 +280,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
     backgroundColor: COLORS.secondary + '15',
@@ -176,6 +298,97 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.secondary,
   },
+  
+  // Pharmacy card styles
+  pharmacyCard: {
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
+    padding: SPACING.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.info + '30',
+  },
+  pharmacyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pharmacyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: COLORS.info + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING.sm,
+  },
+  pharmacyHeaderText: {
+    flex: 1,
+  },
+  pharmacyTitle: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  pharmacyName: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  pharmacyEmpty: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.border,
+    fontStyle: 'italic',
+  },
+  pharmacyActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  pharmacyEditBtn: {
+    padding: SPACING.xs,
+  },
+  pharmacyDetails: {
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  pharmacyDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
+    gap: SPACING.xs,
+  },
+  pharmacyDetailText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    flex: 1,
+  },
+  pharmacyTip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.info + '15',
+    padding: SPACING.md,
+    borderRadius: RADIUS.lg,
+    marginBottom: SPACING.lg,
+    gap: 8,
+  },
+  pharmacyTipText: {
+    flex: 1,
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.info,
+    fontWeight: '600',
+  },
+  formLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: SPACING.xs,
+  },
+  
   emptyState: { alignItems: 'center', paddingVertical: SPACING.xxl },
   emptyTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary, marginTop: SPACING.md },
   emptyText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: SPACING.xs },

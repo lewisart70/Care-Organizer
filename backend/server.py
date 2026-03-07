@@ -79,6 +79,7 @@ class CareRecipientCreate(BaseModel):
     notes: Optional[str] = None
     dnr_info: Optional[dict] = None
     poa_info: Optional[dict] = None
+    pharmacy_info: Optional[dict] = None  # name, address, phone, fax
 
 class CareRecipientOut(BaseModel):
     recipient_id: str
@@ -104,6 +105,7 @@ class CareRecipientOut(BaseModel):
     profile_photo: Optional[str] = None
     dnr_info: Optional[dict] = None
     poa_info: Optional[dict] = None
+    pharmacy_info: Optional[dict] = None
 
 class AudioTranscriptionRequest(BaseModel):
     audio_base64: str
@@ -527,7 +529,7 @@ async def partial_update_care_recipient(recipient_id: str, request: Request, use
         'medical_conditions', 'allergies', 'blood_type', 'weight',
         'blood_pressure', 'blood_pressure_date', 'health_card_number',
         'insurance_info', 'interests', 'favorite_foods', 'favorite_meals',
-        'notes', 'dnr_info', 'poa_info', 'profile_photo'
+        'notes', 'dnr_info', 'poa_info', 'profile_photo', 'pharmacy_info'
     ]
     
     for field in allowed_fields:
