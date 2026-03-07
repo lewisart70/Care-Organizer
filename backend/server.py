@@ -18,6 +18,7 @@ import json
 import base64
 import io
 from emergentintegrations.llm.openai import OpenAISpeechToText
+from emergentintegrations.llm.chat import LlmChat, UserMessage
 import resend
 from passlib.context import CryptContext
 
@@ -353,6 +354,34 @@ class SmartReminderRequest(BaseModel):
 
 class InviteCaregiverRequest(BaseModel):
     email: str
+
+# ======================== CAREGIVER RESOURCE FINDER MODELS ========================
+
+class ResourceSearchRequest(BaseModel):
+    location: str  # e.g., "Toronto, Ontario, Canada" or "Seattle, Washington, USA"
+    category: str  # home_care, government_programs, dementia_support, mental_health, legal_financial, medical_equipment
+    specific_query: Optional[str] = None  # Additional search terms
+
+class ResourceItem(BaseModel):
+    name: str
+    description: str
+    category: str
+    website: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    email: Optional[str] = None
+    notes: Optional[str] = None
+
+class SavedResourceCreate(BaseModel):
+    name: str
+    description: str
+    category: str
+    website: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    email: Optional[str] = None
+    notes: Optional[str] = None
+    location_searched: Optional[str] = None
 
 # ======================== AUTH HELPERS ========================
 
@@ -1818,6 +1847,203 @@ async def get_notifications(user: dict = Depends(get_current_user)):
             except (ValueError, TypeError):
                 pass
     return {"reminders": reminders}
+
+# ======================== CAREGIVER RESOURCE FINDER ROUTES ========================
+
+RESOURCE_CATEGORIES = {
+    "home_care": "Home Care Services (PSW agencies, nursing care, respite care, home health aides)",
+    "government_programs": "Government Healthcare Programs and Subsidies",
+    "dementia_support": "Dementia and Alzheimer's Support (support groups, memory clinics, day programs)",
+    "mental_health": "Caregiver Mental Health Support (counseling, support groups, crisis lines)",
+    "legal_financial": "Elder Law and Financial Planning (lawyers, financial advisors)",
+    "medical_equipment": "Medical Equipment and Supplies (mobility aids, home modifications)"
+}
+
+# Pre-loaded essential resources (always shown)
+ESSENTIAL_RESOURCES = {
+    "canada": [
+        {
+            "name": "Alzheimer Society of Canada",
+            "description": "National organization providing support, education, and resources for those affected by Alzheimer's disease and other dementias.",
+            "category": "dementia_support",
+            "website": "https://alzheimer.ca",
+            "phone": "1-800-616-8816",
+            "notes": "First Link® program connects families with local support"
+        }
+    ],
+    "usa": [
+        {
+            "name": "Alzheimer's Association",
+            "description": "Leading voluntary health organization in Alzheimer's care, support and research.",
+            "category": "dementia_support", 
+            "website": "https://www.alz.org",
+            "phone": "1-800-272-3900",
+            "notes": "24/7 Helpline available"
+        }
+    ]
+}
+
+@api_router.post("/resources/search")
+async def search_caregiver_resources(data: ResourceSearchRequest, user: dict = Depends(get_current_user)):
+    """
+    AI-powered search for caregiver support resources based on location and category.
+    Uses GPT to find and format relevant local resources.
+    """
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(status_code=500, detail="AI service not configured")
+    
+    category_description = RESOURCE_CATEGORIES.get(data.category, data.category)
+    
+    # Build the search prompt
+    search_prompt = f"""You are a helpful assistant specializing in finding caregiver support resources. 
+    
+The user is looking for {category_description} in {data.location}.
+{f"Additional search criteria: {data.specific_query}" if data.specific_query else ""}
+
+Please search for and provide 5-8 REAL, VERIFIED resources that are:
+1. Actually available in or serving {data.location}
+2. Currently operating (not defunct organizations)
+3. Relevant to the category: {category_description}
+
+For each resource, provide:
+- name: Official organization name
+- description: Brief description of services (1-2 sentences)
+- website: Official website URL (if available)
+- phone: Contact phone number (if available)
+- address: Physical address or service area (if applicable)
+- email: Contact email (if available)
+- notes: Any important notes (eligibility, fees, hours, etc.)
+
+IMPORTANT:
+- Focus on government programs, non-profits, and established service providers
+- Include regional health authority contacts if applicable
+- For Canada, include provincial health programs (e.g., Ontario Health at Home, BC Home Health)
+- For USA, include state/county programs and Area Agency on Aging contacts
+- Prioritize free or subsidized services when available
+
+Return your response as a JSON array of objects with the fields listed above.
+Only return the JSON array, no additional text or explanation.
+Example format:
+[
+  {{"name": "Example Service", "description": "Description here", "website": "https://example.com", "phone": "1-800-555-1234", "address": "123 Main St", "email": "info@example.com", "notes": "Free for residents"}}
+]"""
+
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"resource_search_{user['user_id']}_{uuid.uuid4().hex[:8]}",
+            system_message="You are a knowledgeable assistant that helps caregivers find support resources. Always provide accurate, real-world information about actual organizations and programs."
+        ).with_model("openai", "gpt-4o")
+        
+        user_message = UserMessage(text=search_prompt)
+        response = await chat.send_message(user_message)
+        
+        # Parse the JSON response
+        # Clean up the response - remove markdown code blocks if present
+        cleaned_response = response.strip()
+        if cleaned_response.startswith("```json"):
+            cleaned_response = cleaned_response[7:]
+        if cleaned_response.startswith("```"):
+            cleaned_response = cleaned_response[3:]
+        if cleaned_response.endswith("```"):
+            cleaned_response = cleaned_response[:-3]
+        cleaned_response = cleaned_response.strip()
+        
+        resources = json.loads(cleaned_response)
+        
+        # Determine country for essential resources
+        location_lower = data.location.lower()
+        essential = []
+        if any(country in location_lower for country in ["canada", "ontario", "british columbia", "alberta", "quebec", "manitoba", "saskatchewan"]):
+            essential = ESSENTIAL_RESOURCES.get("canada", [])
+        elif any(country in location_lower for country in ["usa", "united states", "america", "california", "texas", "new york", "florida"]):
+            essential = ESSENTIAL_RESOURCES.get("usa", [])
+        
+        # Filter essential resources by category if specified
+        if data.category != "all":
+            essential = [r for r in essential if r.get("category") == data.category]
+        
+        return {
+            "success": True,
+            "location": data.location,
+            "category": data.category,
+            "resources": resources,
+            "essential_resources": essential,
+            "total_count": len(resources) + len(essential)
+        }
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse AI response: {e}")
+        # Return essential resources even if AI fails
+        location_lower = data.location.lower()
+        essential = []
+        if any(country in location_lower for country in ["canada", "ontario", "british columbia", "alberta", "quebec"]):
+            essential = ESSENTIAL_RESOURCES.get("canada", [])
+        elif any(country in location_lower for country in ["usa", "united states", "america"]):
+            essential = ESSENTIAL_RESOURCES.get("usa", [])
+        
+        return {
+            "success": False,
+            "message": "Could not parse AI response, showing essential resources only",
+            "location": data.location,
+            "category": data.category,
+            "resources": [],
+            "essential_resources": essential,
+            "total_count": len(essential)
+        }
+    except Exception as e:
+        logger.error(f"Resource search error: {e}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+@api_router.get("/resources/categories")
+async def get_resource_categories(user: dict = Depends(get_current_user)):
+    """Get list of available resource categories."""
+    return {
+        "categories": [
+            {"id": "home_care", "name": "Home Care Services", "icon": "home", "description": "PSW agencies, nursing care, respite care"},
+            {"id": "government_programs", "name": "Government Programs", "icon": "business", "description": "Healthcare subsidies, provincial/state programs"},
+            {"id": "dementia_support", "name": "Dementia & Alzheimer's", "icon": "heart", "description": "Support groups, memory clinics, day programs"},
+            {"id": "mental_health", "name": "Caregiver Mental Health", "icon": "happy", "description": "Counseling, support groups, crisis lines"},
+            {"id": "legal_financial", "name": "Legal & Financial", "icon": "document-text", "description": "Elder law attorneys, financial advisors"},
+            {"id": "medical_equipment", "name": "Medical Equipment", "icon": "medkit", "description": "Mobility aids, home safety equipment"}
+        ]
+    }
+
+# ======================== SAVED RESOURCES ROUTES ========================
+
+@api_router.post("/resources/saved")
+async def save_resource(data: SavedResourceCreate, user: dict = Depends(get_current_user)):
+    """Save a resource to user's bookmarks."""
+    resource_id = f"res_{uuid.uuid4().hex[:12]}"
+    doc = {
+        "resource_id": resource_id,
+        "user_id": user["user_id"],
+        **data.dict(),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.saved_resources.insert_one(doc)
+    doc.pop("_id", None)
+    return {"message": "Resource saved", "resource": doc}
+
+@api_router.get("/resources/saved")
+async def get_saved_resources(user: dict = Depends(get_current_user)):
+    """Get user's saved/bookmarked resources."""
+    resources = await db.saved_resources.find(
+        {"user_id": user["user_id"]}, 
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return resources
+
+@api_router.delete("/resources/saved/{resource_id}")
+async def delete_saved_resource(resource_id: str, user: dict = Depends(get_current_user)):
+    """Remove a saved resource."""
+    result = await db.saved_resources.delete_one({
+        "resource_id": resource_id,
+        "user_id": user["user_id"]
+    })
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    return {"message": "Resource removed"}
 
 # ======================== SETUP ========================
 
