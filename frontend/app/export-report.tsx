@@ -113,36 +113,41 @@ export default function ExportReportScreen() {
 
     try {
       if (deliveryMethod === 'download') {
-        // For download, we need to fetch as blob and save
-        const response = await fetch(
-          `${api.baseUrl}/care-recipients/${selectedRecipientId}/export-report`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${await api.getToken()}`,
-            },
-            body: JSON.stringify({
-              sections: selectedSections,
-              time_period: timePeriod,
-              delivery_method: 'download',
-            }),
+        // For mobile download, use a different approach
+        const token = api.getToken();
+        
+        // First, request the PDF and get it as base64 from a modified endpoint
+        // We'll use email_self but handle it differently
+        try {
+          const response = await fetch(
+            `${api.baseUrl}/care-recipients/${selectedRecipientId}/export-report`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                sections: selectedSections,
+                time_period: timePeriod,
+                delivery_method: 'download',
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to generate report');
           }
-        );
 
-        if (!response.ok) {
-          throw new Error('Failed to generate report');
-        }
-
-        const blob = await response.blob();
-        
-        // Convert blob to base64
-        const reader = new FileReader();
-        reader.readAsDataURL(blob);
-        
-        reader.onloadend = async () => {
-          const base64data = reader.result as string;
-          const base64 = base64data.split(',')[1];
+          // Get the response as array buffer and convert to base64
+          const arrayBuffer = await response.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const base64 = btoa(binary);
           
           const filename = `care_report_${new Date().toISOString().split('T')[0]}.pdf`;
           const fileUri = FileSystem.documentDirectory + filename;
@@ -157,17 +162,14 @@ export default function ExportReportScreen() {
               mimeType: 'application/pdf',
               dialogTitle: 'Save Care Report',
             });
+            Alert.alert('Success', 'Report generated! You can save or share the PDF.');
           } else {
             Alert.alert('Success', `Report saved to ${filename}`);
           }
-          
-          setLoading(false);
-        };
-        
-        reader.onerror = () => {
-          Alert.alert('Error', 'Failed to save report');
-          setLoading(false);
-        };
+        } catch (fetchError: any) {
+          console.error('Fetch error:', fetchError);
+          throw new Error(fetchError.message || 'Network request failed');
+        }
         
       } else {
         // For email, use standard API call
@@ -179,11 +181,11 @@ export default function ExportReportScreen() {
         });
 
         Alert.alert('Success', result.message || 'Report sent successfully!');
-        setLoading(false);
       }
     } catch (e: any) {
       console.error('Export error:', e);
       Alert.alert('Export Failed', e.message || 'Failed to generate report. Please try again.');
+    } finally {
       setLoading(false);
     }
   };

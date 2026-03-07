@@ -2203,12 +2203,12 @@ def generate_care_report_pdf(care_recipient: dict, data: dict, sections: List[st
     # Doctors Section
     if "doctors" in sections and data.get("doctors"):
         story.append(Paragraph("Doctors & Specialists", section_header_style))
-        for doc in data["doctors"]:
-            doc_text = f"<b>{doc.get('name', 'Unknown')}</b> - {doc.get('specialty', '')}"
-            if doc.get('phone'):
-                doc_text += f"<br/>Phone: {doc.get('phone')}"
-            if doc.get('address'):
-                doc_text += f"<br/>Address: {doc.get('address')}"
+        for doctor in data["doctors"]:
+            doc_text = f"<b>{doctor.get('name', 'Unknown')}</b> - {doctor.get('specialty', '')}"
+            if doctor.get('phone'):
+                doc_text += f"<br/>Phone: {doctor.get('phone')}"
+            if doctor.get('address'):
+                doc_text += f"<br/>Address: {doctor.get('address')}"
             story.append(Paragraph(doc_text, normal_style))
         story.append(Spacer(1, 10))
     

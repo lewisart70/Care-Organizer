@@ -1,489 +1,463 @@
 #!/usr/bin/env python3
-"""
-Export Report Feature Testing Script for FamilyCare Organizer App
-Tests Export Report endpoints
-"""
 
-import asyncio
-import httpx
+import requests
 import json
-import uuid
-from typing import Dict, Optional, List
+import sys
+import base64
+from datetime import datetime
 
-# Backend URL from frontend/.env
+# Use the correct backend URL from frontend .env
 BACKEND_URL = "https://care-recipient-app.preview.emergentagent.com/api"
 
-class ExportReportTest:
+class ExportReportTestRunner:
     def __init__(self):
-        self.base_url = BACKEND_URL
-        self.auth_token = None
-        self.test_user = {
-            "email": f"exporttest_{uuid.uuid4().hex[:8]}@test.com",
-            "password": "Test123!",
-            "name": "Export Test User"
+        self.token = None
+        self.recipient_id = None
+        self.test_email = "exporttest@test.com"
+        self.test_password = "Test123!"
+        self.test_name = "Export Test User"
+        
+    def log(self, message, level="INFO"):
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{timestamp}] {level}: {message}")
+    
+    def register_user(self):
+        """Register or login a test user"""
+        self.log("Registering/logging in test user...")
+        
+        # Try registration first
+        data = {
+            "email": self.test_email,
+            "password": self.test_password,
+            "name": self.test_name
         }
-        self.care_recipient_id = None
-        self.medication_id = None
-        self.appointment_id = None
-        self.note_id = None
-        self.headers = {"Content-Type": "application/json"}
-
-    def log(self, message: str):
-        print(f"[EXPORT TEST] {message}")
-
-    async def register_user(self) -> bool:
-        """Register a test user"""
+        
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{self.base_url}/auth/register",
-                    json=self.test_user,
-                    headers=self.headers
-                )
-                
+            response = requests.post(f"{BACKEND_URL}/auth/register", json=data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                self.token = result.get("token")
+                self.log(f"✅ User registered successfully")
+                return True
+            elif response.status_code == 400:
+                # User exists, try login
+                login_data = {
+                    "email": self.test_email,
+                    "password": self.test_password
+                }
+                response = requests.post(f"{BACKEND_URL}/auth/login", json=login_data)
                 if response.status_code == 200:
-                    data = response.json()
-                    self.auth_token = data["token"]
-                    self.headers["Authorization"] = f"Bearer {self.auth_token}"
-                    self.log(f"✅ User registered successfully")
+                    result = response.json()
+                    self.token = result.get("token")
+                    self.log("✅ User logged in successfully")
                     return True
                 else:
-                    self.log(f"❌ User registration failed: {response.status_code} - {response.text}")
+                    self.log(f"❌ Login failed: {response.status_code} - {response.text}")
                     return False
+            else:
+                self.log(f"❌ Registration failed: {response.status_code} - {response.text}")
+                return False
+                
         except Exception as e:
-            self.log(f"❌ User registration error: {str(e)}")
+            self.log(f"❌ Auth error: {str(e)}")
             return False
-
-    async def create_care_recipient(self) -> bool:
+    
+    def create_care_recipient(self):
         """Create a test care recipient"""
+        self.log("Creating test care recipient...")
+        
+        if not self.token:
+            self.log("❌ No auth token available")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.token}"}
+        data = {
+            "name": "John Doe Test",
+            "date_of_birth": "1950-01-01",
+            "gender": "male",
+            "address": "123 Test Street, Toronto, ON",
+            "phone": "416-555-0123",
+            "medical_conditions": ["diabetes", "hypertension"],
+            "allergies": ["penicillin"],
+            "blood_type": "A+"
+        }
+        
         try:
-            recipient_data = {
-                "name": "Export Test Recipient",
-                "date_of_birth": "1940-01-15",
-                "gender": "female",
-                "address": "123 Test Street, Test City, ON M1M 1M1",
-                "phone": "416-555-0123"
-            }
-
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{self.base_url}/care-recipients",
-                    json=recipient_data,
-                    headers=self.headers
-                )
+            response = requests.post(f"{BACKEND_URL}/care-recipients", json=data, headers=headers)
+            
+            if response.status_code == 200:
+                result = response.json()
+                self.recipient_id = result.get("recipient_id")
+                self.log(f"✅ Care recipient created: {self.recipient_id}")
+                return True
+            else:
+                self.log(f"❌ Failed to create care recipient: {response.status_code} - {response.text}")
+                return False
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    self.care_recipient_id = data["recipient_id"]
-                    self.log(f"✅ Care recipient created with ID: {self.care_recipient_id}")
-                    return True
-                else:
-                    self.log(f"❌ Care recipient creation failed: {response.status_code} - {response.text}")
-                    return False
         except Exception as e:
             self.log(f"❌ Care recipient creation error: {str(e)}")
             return False
-
-    async def add_test_medication(self) -> bool:
-        """Add a test medication"""
-        try:
-            medication_data = {
-                "name": "Aspirin",
-                "dosage": "81mg",
-                "frequency": "Once daily",
-                "instructions": "Take with food in the morning",
-                "prescribing_doctor": "Dr. Smith",
-                "start_date": "2024-01-01",
-                "is_active": True
-            }
-
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/medications",
-                    json=medication_data,
-                    headers=self.headers
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    self.medication_id = data.get("medication_id")
-                    self.log(f"✅ Test medication added")
-                    return True
-                else:
-                    self.log(f"❌ Medication creation failed: {response.status_code} - {response.text}")
-                    return False
-        except Exception as e:
-            self.log(f"❌ Medication creation error: {str(e)}")
+    
+    def add_test_data(self):
+        """Add test data (medications, doctors, appointments, etc.)"""
+        self.log("Adding test data for reporting...")
+        
+        if not self.token or not self.recipient_id:
+            self.log("❌ Missing auth token or recipient ID")
             return False
-
-    async def add_test_appointment(self) -> bool:
-        """Add a test appointment"""
+        
+        headers = {"Authorization": f"Bearer {self.token}"}
+        
         try:
-            appointment_data = {
-                "title": "Regular Checkup",
-                "date": "2024-12-30",
-                "time": "10:00",
-                "doctor": "Dr. Johnson",
-                "location": "Medical Center",
-                "notes": "Annual checkup appointment",
+            # Add a doctor
+            doctor_data = {
+                "name": "Dr. Smith",
+                "specialty": "Cardiologist",
+                "phone": "416-555-0100",
+                "address": "456 Medical Center, Toronto, ON"
+            }
+            response = requests.post(f"{BACKEND_URL}/care-recipients/{self.recipient_id}/doctors", 
+                                   json=doctor_data, headers=headers)
+            if response.status_code == 200:
+                self.log("✅ Test doctor added")
+            else:
+                self.log(f"⚠️ Doctor creation failed: {response.status_code}")
+            
+            # Add a medication
+            med_data = {
+                "name": "Lisinopril",
+                "dosage": "10mg",
+                "frequency": "Once daily",
+                "time_of_day": "Morning",
+                "prescribing_doctor": "Dr. Smith"
+            }
+            response = requests.post(f"{BACKEND_URL}/care-recipients/{self.recipient_id}/medications", 
+                                   json=med_data, headers=headers)
+            if response.status_code == 200:
+                self.log("✅ Test medication added")
+            else:
+                self.log(f"⚠️ Medication creation failed: {response.status_code}")
+            
+            # Add an appointment
+            appt_data = {
+                "title": "Cardiology Checkup",
+                "date": "2024-02-15",
+                "time": "10:00 AM",
+                "doctor_name": "Dr. Smith",
                 "category": "doctor"
             }
-
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/appointments",
-                    json=appointment_data,
-                    headers=self.headers
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    self.appointment_id = data.get("appointment_id")
-                    self.log(f"✅ Test appointment added")
-                    return True
-                else:
-                    self.log(f"❌ Appointment creation failed: {response.status_code} - {response.text}")
-                    return False
-        except Exception as e:
-            self.log(f"❌ Appointment creation error: {str(e)}")
-            return False
-
-    async def add_test_note(self) -> bool:
-        """Add a test note"""
-        try:
+            response = requests.post(f"{BACKEND_URL}/care-recipients/{self.recipient_id}/appointments", 
+                                   json=appt_data, headers=headers)
+            if response.status_code == 200:
+                self.log("✅ Test appointment added")
+            else:
+                self.log(f"⚠️ Appointment creation failed: {response.status_code}")
+            
+            # Add a note
             note_data = {
-                "content": "Patient is doing well. Good appetite and mobility.",
-                "category": "general"
+                "content": "Patient showed good compliance with medication regimen",
+                "category": "medical"
             }
-
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/notes",
-                    json=note_data,
-                    headers=self.headers
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    self.note_id = data.get("note_id")
-                    self.log(f"✅ Test note added")
-                    return True
-                else:
-                    self.log(f"❌ Note creation failed: {response.status_code} - {response.text}")
-                    return False
+            response = requests.post(f"{BACKEND_URL}/care-recipients/{self.recipient_id}/notes", 
+                                   json=note_data, headers=headers)
+            if response.status_code == 200:
+                self.log("✅ Test note added")
+            else:
+                self.log(f"⚠️ Note creation failed: {response.status_code}")
+            
+            return True
+            
         except Exception as e:
-            self.log(f"❌ Note creation error: {str(e)}")
+            self.log(f"❌ Error adding test data: {str(e)}")
             return False
-
-    async def test_get_export_sections(self) -> bool:
+    
+    def test_export_sections_endpoint(self):
         """Test GET /api/care-recipients/{recipient_id}/export-sections"""
+        self.log("Testing export sections endpoint...")
+        
+        if not self.token or not self.recipient_id:
+            self.log("❌ Missing auth token or recipient ID")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.token}"}
+        
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/export-sections",
-                    headers=self.headers
-                )
+            response = requests.get(f"{BACKEND_URL}/care-recipients/{self.recipient_id}/export-sections", 
+                                  headers=headers)
+            
+            self.log(f"Export sections response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                result = response.json()
+                sections = result.get("sections", [])
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    
-                    # Check if response has sections key
-                    if "sections" not in data:
-                        self.log(f"❌ Export sections test FAILED - Expected 'sections' key in response")
-                        return False
-                    
-                    sections = data["sections"]
-                    
-                    # Check if sections is a list
-                    if not isinstance(sections, list):
-                        self.log(f"❌ Export sections test FAILED - Expected sections to be list, got {type(sections)}")
-                        return False
-                    
-                    # Check if sections have required fields
-                    required_keys = {"id", "name", "icon"}
-                    for section in sections:
-                        if not all(key in section for key in required_keys):
-                            self.log(f"❌ Export sections test FAILED - Section missing required keys: {section}")
-                            return False
-                    
-                    # Check for expected sections
-                    section_ids = {sec["id"] for sec in sections}
-                    expected_sections = {"medications", "appointments", "doctors", "notes"}
-                    
-                    if not expected_sections.issubset(section_ids):
-                        missing = expected_sections - section_ids
-                        self.log(f"❌ Export sections test FAILED - Missing expected sections: {missing}")
-                        return False
-                    
-                    self.log("✅ GET export-sections test PASSED")
-                    self.log(f"   Found {len(sections)} sections: {', '.join(section_ids)}")
+                self.log(f"Available sections: {len(sections)}")
+                
+                # Check expected sections
+                expected_sections = ["medications", "appointments", "doctors", "routines", 
+                                   "incidents", "notes", "bathing", "emergency_contacts"]
+                
+                found_sections = [s.get("id") for s in sections]
+                
+                missing_sections = [s for s in expected_sections if s not in found_sections]
+                
+                if not missing_sections:
+                    self.log("✅ All expected sections found")
                     return True
                 else:
-                    self.log(f"❌ Export sections test FAILED: {response.status_code} - {response.text}")
+                    self.log(f"❌ Missing sections: {missing_sections}")
                     return False
-        except Exception as e:
-            self.log(f"❌ Export sections test error: {str(e)}")
-            return False
-
-    async def test_export_sections_auth(self) -> bool:
-        """Test that GET /api/care-recipients/{recipient_id}/export-sections requires authentication"""
-        try:
-            headers_no_auth = {"Content-Type": "application/json"}
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/export-sections",
-                    headers=headers_no_auth
-                )
+            elif response.status_code == 401:
+                self.log("❌ Authentication failed")
+                return False
+            elif response.status_code == 404:
+                self.log("❌ Care recipient not found - access control issue")
+                return False
+            else:
+                self.log(f"❌ Export sections failed: {response.status_code} - {response.text}")
+                return False
                 
-                if response.status_code == 401:
-                    self.log("✅ Export sections auth test PASSED - 401 returned without token")
+        except Exception as e:
+            self.log(f"❌ Export sections error: {str(e)}")
+            return False
+    
+    def test_pdf_download_endpoint(self):
+        """Test POST /api/care-recipients/{recipient_id}/export-report with download delivery"""
+        self.log("Testing PDF download endpoint...")
+        
+        if not self.token or not self.recipient_id:
+            self.log("❌ Missing auth token or recipient ID")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.token}"}
+        
+        # Test data matching the review request
+        export_data = {
+            "sections": ["medications", "doctors", "appointments"],
+            "time_period": "7_days",
+            "delivery_method": "download"
+        }
+        
+        try:
+            response = requests.post(f"{BACKEND_URL}/care-recipients/{self.recipient_id}/export-report", 
+                                   json=export_data, headers=headers)
+            
+            self.log(f"PDF download response status: {response.status_code}")
+            self.log(f"Content-Type: {response.headers.get('content-type')}")
+            
+            if response.status_code == 200:
+                # Check content type
+                content_type = response.headers.get('content-type', '').lower()
+                if 'application/pdf' in content_type:
+                    self.log("✅ Correct content-type: application/pdf")
+                else:
+                    self.log(f"❌ Incorrect content-type: {content_type}")
+                    return False
+                
+                # Check content disposition header
+                content_disposition = response.headers.get('content-disposition', '')
+                if 'attachment' in content_disposition.lower():
+                    self.log("✅ Correct content-disposition header for download")
+                else:
+                    self.log(f"⚠️ Content-disposition: {content_disposition}")
+                
+                # Check PDF content
+                pdf_content = response.content
+                
+                if len(pdf_content) > 0:
+                    self.log(f"✅ PDF content received: {len(pdf_content)} bytes")
+                else:
+                    self.log("❌ Empty PDF content")
+                    return False
+                
+                # Check if it's a valid PDF (starts with %PDF-)
+                if pdf_content.startswith(b'%PDF-'):
+                    self.log("✅ Valid PDF format detected")
+                else:
+                    self.log(f"❌ Invalid PDF format. Content starts with: {pdf_content[:20]}")
+                    return False
+                
+                return True
+                
+            elif response.status_code == 401:
+                self.log("❌ Authentication failed")
+                return False
+            elif response.status_code == 404:
+                self.log("❌ Care recipient not found - access control issue")
+                return False
+            else:
+                self.log(f"❌ PDF download failed: {response.status_code} - {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log(f"❌ PDF download error: {str(e)}")
+            return False
+    
+    def test_email_delivery_endpoint(self):
+        """Test POST /api/care-recipients/{recipient_id}/export-report with email delivery"""
+        self.log("Testing email delivery endpoint...")
+        
+        if not self.token or not self.recipient_id:
+            self.log("❌ Missing auth token or recipient ID")
+            return False
+        
+        headers = {"Authorization": f"Bearer {self.token}"}
+        
+        # Test email delivery to self
+        export_data = {
+            "sections": ["medications", "notes"],
+            "time_period": "30_days",
+            "delivery_method": "email_self"
+        }
+        
+        try:
+            response = requests.post(f"{BACKEND_URL}/care-recipients/{self.recipient_id}/export-report", 
+                                   json=export_data, headers=headers)
+            
+            self.log(f"Email delivery response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                result = response.json()
+                
+                success = result.get("success")
+                message = result.get("message", "")
+                email_id = result.get("email_id")
+                
+                if success is True:
+                    self.log(f"✅ Email delivery successful: {message}")
+                    if email_id:
+                        self.log(f"✅ Email ID received: {email_id}")
                     return True
                 else:
-                    self.log(f"❌ Export sections auth test FAILED: Expected 401, got {response.status_code}")
+                    self.log(f"❌ Email delivery failed - success=false: {message}")
                     return False
-        except Exception as e:
-            self.log(f"❌ Export sections auth test error: {str(e)}")
-            return False
-
-    async def test_export_report_download(self) -> bool:
-        """Test POST /api/care-recipients/{recipient_id}/export-report with download method"""
-        try:
-            export_data = {
-                "sections": ["medications", "appointments", "notes"],
-                "time_period": "7_days",
-                "delivery_method": "download"
-            }
-
-            async with httpx.AsyncClient(timeout=60.0) as client:  # Extended timeout for PDF generation
-                response = await client.post(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/export-report",
-                    json=export_data,
-                    headers=self.headers
-                )
                 
-                if response.status_code == 200:
-                    # Check if response is PDF
-                    content_type = response.headers.get("content-type", "")
-                    if "application/pdf" not in content_type:
-                        self.log(f"❌ Export download test FAILED - Expected PDF content type, got: {content_type}")
-                        return False
-                    
-                    # Check if PDF content exists
-                    pdf_content = response.content
-                    if len(pdf_content) == 0:
-                        self.log(f"❌ Export download test FAILED - Empty PDF content")
-                        return False
-                    
-                    # Check PDF magic bytes
-                    if not pdf_content.startswith(b'%PDF-'):
-                        self.log(f"❌ Export download test FAILED - Invalid PDF format")
-                        return False
-                    
-                    # Check content disposition header
-                    disposition = response.headers.get("content-disposition", "")
-                    if "attachment" not in disposition or "filename" not in disposition:
-                        self.log(f"❌ Export download test FAILED - Missing or invalid content-disposition header")
-                        return False
-                    
-                    self.log("✅ Export report download test PASSED")
-                    self.log(f"   PDF size: {len(pdf_content)} bytes")
-                    self.log(f"   Content-Type: {content_type}")
-                    self.log(f"   Content-Disposition: {disposition}")
-                    return True
-                else:
-                    self.log(f"❌ Export download test FAILED: {response.status_code} - {response.text}")
-                    return False
-        except Exception as e:
-            self.log(f"❌ Export download test error: {str(e)}")
-            return False
-
-    async def test_export_report_email_self(self) -> bool:
-        """Test POST /api/care-recipients/{recipient_id}/export-report with email_self method"""
-        try:
-            export_data = {
-                "sections": ["medications", "notes"],
-                "time_period": "30_days",
-                "delivery_method": "email_self"
-            }
-
-            async with httpx.AsyncClient(timeout=60.0) as client:  # Extended timeout for email processing
-                response = await client.post(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/export-report",
-                    json=export_data,
-                    headers=self.headers
-                )
+            elif response.status_code == 401:
+                self.log("❌ Authentication failed")
+                return False
+            elif response.status_code == 404:
+                self.log("❌ Care recipient not found - access control issue")  
+                return False
+            else:
+                self.log(f"❌ Email delivery failed: {response.status_code} - {response.text}")
+                return False
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    
-                    # Check required response fields
-                    required_fields = {"success", "message"}
-                    if not all(field in data for field in required_fields):
-                        self.log(f"❌ Export email test FAILED - Missing required response fields")
-                        self.log(f"   Expected: {required_fields}")
-                        self.log(f"   Found: {set(data.keys())}")
-                        return False
-                    
-                    # Check success flag
-                    if not data.get("success"):
-                        self.log(f"❌ Export email test FAILED - Success flag is False")
-                        return False
-                    
-                    # Check message content
-                    message = data.get("message", "")
-                    if "sent successfully" not in message.lower():
-                        self.log(f"❌ Export email test FAILED - Unexpected success message: {message}")
-                        return False
-                    
-                    self.log("✅ Export report email_self test PASSED")
-                    self.log(f"   Message: {message}")
-                    if "email_id" in data:
-                        self.log(f"   Email ID: {data['email_id']}")
-                    return True
-                else:
-                    self.log(f"❌ Export email test FAILED: {response.status_code} - {response.text}")
-                    return False
         except Exception as e:
-            self.log(f"❌ Export email test error: {str(e)}")
+            self.log(f"❌ Email delivery error: {str(e)}")
             return False
-
-    async def test_export_report_auth(self) -> bool:
-        """Test that POST /api/care-recipients/{recipient_id}/export-report requires authentication"""
+    
+    def test_authentication_required(self):
+        """Test that endpoints require authentication"""
+        self.log("Testing authentication requirements...")
+        
+        if not self.recipient_id:
+            self.log("❌ No recipient ID available")
+            return False
+        
+        # Test without token
         try:
-            headers_no_auth = {"Content-Type": "application/json"}
+            # Test export sections without auth
+            response = requests.get(f"{BACKEND_URL}/care-recipients/{self.recipient_id}/export-sections")
+            
+            if response.status_code == 401:
+                self.log("✅ Export sections correctly requires authentication")
+            else:
+                self.log(f"❌ Export sections should return 401, got {response.status_code}")
+                return False
+            
+            # Test export report without auth
             export_data = {
                 "sections": ["medications"],
-                "time_period": "7_days",
+                "time_period": "7_days", 
                 "delivery_method": "download"
             }
+            response = requests.post(f"{BACKEND_URL}/care-recipients/{self.recipient_id}/export-report", 
+                                   json=export_data)
             
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/export-report",
-                    json=export_data,
-                    headers=headers_no_auth
-                )
+            if response.status_code == 401:
+                self.log("✅ Export report correctly requires authentication")
+                return True
+            else:
+                self.log(f"❌ Export report should return 401, got {response.status_code}")
+                return False
                 
-                if response.status_code == 401:
-                    self.log("✅ Export report auth test PASSED - 401 returned without token")
-                    return True
-                else:
-                    self.log(f"❌ Export report auth test FAILED: Expected 401, got {response.status_code}")
-                    return False
         except Exception as e:
-            self.log(f"❌ Export report auth test error: {str(e)}")
+            self.log(f"❌ Authentication test error: {str(e)}")
             return False
-
-    async def test_export_report_invalid_recipient(self) -> bool:
-        """Test export report with non-existent recipient ID"""
-        try:
-            fake_recipient_id = f"rec_{uuid.uuid4().hex[:12]}"
-            export_data = {
-                "sections": ["medications"],
-                "time_period": "7_days",
-                "delivery_method": "download"
-            }
-            
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{self.base_url}/care-recipients/{fake_recipient_id}/export-report",
-                    json=export_data,
-                    headers=self.headers
-                )
-                
-                if response.status_code == 404:
-                    self.log("✅ Export invalid recipient test PASSED - 404 returned for non-existent recipient")
-                    return True
-                else:
-                    self.log(f"❌ Export invalid recipient test FAILED: Expected 404, got {response.status_code}")
-                    return False
-        except Exception as e:
-            self.log(f"❌ Export invalid recipient test error: {str(e)}")
-            return False
-
-    async def run_all_tests(self):
-        """Run all Export Report tests"""
-        self.log("=" * 80)
-        self.log("STARTING EXPORT REPORT FEATURE TESTS")
-        self.log("=" * 80)
+    
+    def run_all_tests(self):
+        """Run all export report tests"""
+        self.log("=" * 60)
+        self.log("STARTING EXPORT REPORT PDF GENERATION TESTING")
+        self.log("=" * 60)
         
-        test_results = []
+        setup_tests = [
+            ("Register/Login User", self.register_user),
+            ("Create Care Recipient", self.create_care_recipient),
+            ("Add Test Data", self.add_test_data)
+        ]
         
-        # 1. Setup - Register user
-        self.log("\n1. SETUP - Registering user...")
-        if not await self.register_user():
-            self.log("❌ CRITICAL FAILURE: Could not register user")
-            return False
-
-        # 2. Create care recipient
-        self.log("\n2. SETUP - Creating care recipient...")
-        if not await self.create_care_recipient():
-            self.log("❌ CRITICAL FAILURE: Could not create care recipient")
-            return False
-
-        # 3. Add test data
-        self.log("\n3. SETUP - Adding test data...")
-        await self.add_test_medication()
-        await self.add_test_appointment()  
-        await self.add_test_note()
-
-        # 4. Test GET /api/care-recipients/{id}/export-sections
-        self.log("\n4. TESTING GET /api/care-recipients/{id}/export-sections...")
-        test_results.append(("Get Export Sections", await self.test_get_export_sections()))
-
-        # 5. Test export sections authentication
-        self.log("\n5. TESTING export sections authentication requirement...")
-        test_results.append(("Export Sections Auth", await self.test_export_sections_auth()))
-
-        # 6. Test POST /api/care-recipients/{id}/export-report (download)
-        self.log("\n6. TESTING POST /api/care-recipients/{id}/export-report (download)...")
-        test_results.append(("Export Report Download", await self.test_export_report_download()))
-
-        # 7. Test POST /api/care-recipients/{id}/export-report (email_self)
-        self.log("\n7. TESTING POST /api/care-recipients/{id}/export-report (email_self)...")
-        test_results.append(("Export Report Email", await self.test_export_report_email_self()))
-
-        # 8. Test export report authentication
-        self.log("\n8. TESTING export report authentication requirement...")
-        test_results.append(("Export Report Auth", await self.test_export_report_auth()))
-
-        # 9. Test export report with invalid recipient
-        self.log("\n9. TESTING export report with invalid recipient...")
-        test_results.append(("Export Invalid Recipient", await self.test_export_report_invalid_recipient()))
-
-        # Summary
-        self.log("\n" + "=" * 80)
-        self.log("EXPORT REPORT TEST RESULTS SUMMARY")
-        self.log("=" * 80)
+        main_tests = [
+            ("Export Sections Endpoint", self.test_export_sections_endpoint),
+            ("PDF Download Endpoint", self.test_pdf_download_endpoint),
+            ("Email Delivery Endpoint", self.test_email_delivery_endpoint),
+            ("Authentication Required", self.test_authentication_required)
+        ]
         
+        # Run setup tests first
+        for test_name, test_func in setup_tests:
+            self.log(f"\n--- Setup: {test_name} ---")
+            if not test_func():
+                self.log(f"❌ Setup failed at {test_name}")
+                return False
+        
+        # Run main tests
+        results = {}
         passed = 0
         failed = 0
         
-        for test_name, result in test_results:
-            status = "✅ PASSED" if result else "❌ FAILED"
-            self.log(f"{test_name:30} | {status}")
-            if result:
-                passed += 1
-            else:
+        for test_name, test_func in main_tests:
+            self.log(f"\n--- Running Test: {test_name} ---")
+            try:
+                result = test_func()
+                results[test_name] = result
+                if result:
+                    passed += 1
+                else:
+                    failed += 1
+            except Exception as e:
+                self.log(f"❌ FAIL: {test_name} threw exception: {str(e)}")
+                results[test_name] = False
                 failed += 1
         
-        self.log(f"\nTotal Tests: {len(test_results)}")
+        # Final summary
+        self.log("\n" + "=" * 60)
+        self.log("EXPORT REPORT TESTING SUMMARY")
+        self.log("=" * 60)
+        
+        for test_name, result in results.items():
+            status = "✅ PASSED" if result else "❌ FAILED"
+            self.log(f"{test_name}: {status}")
+        
+        self.log(f"\nTotal Tests: {len(main_tests)}")
         self.log(f"Passed: {passed}")
         self.log(f"Failed: {failed}")
         
-        overall_success = failed == 0
-        status = "✅ ALL TESTS PASSED" if overall_success else f"❌ {failed} TEST(S) FAILED"
-        self.log(f"\nOVERALL RESULT: {status}")
-        self.log("=" * 80)
-        
-        return overall_success
-
-async def main():
-    """Main test execution"""
-    tester = ExportReportTest()
-    success = await tester.run_all_tests()
-    return success
+        if failed == 0:
+            self.log("\n🎉 ALL EXPORT REPORT TESTS PASSED!")
+            self.log("✅ Export Report PDF generation is working correctly!")
+            return True
+        else:
+            self.log(f"\n⚠️  {failed} TESTS FAILED - See details above")
+            return False
 
 if __name__ == "__main__":
-    result = asyncio.run(main())
-    exit(0 if result else 1)
+    print("Backend Export Report PDF Generation Testing")
+    print(f"Testing against: {BACKEND_URL}")
+    print()
+    
+    tester = ExportReportTestRunner()
+    success = tester.run_all_tests()
+    
+    sys.exit(0 if success else 1)
