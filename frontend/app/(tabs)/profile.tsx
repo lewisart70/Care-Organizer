@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/utils/api';
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../../src/constants/theme';
@@ -13,6 +14,7 @@ export default function ProfileScreen() {
   const [recipient, setRecipient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const loadProfile = useCallback(async () => {
     if (!selectedRecipientId) { setLoading(false); return; }
@@ -22,6 +24,80 @@ export default function ProfileScreen() {
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
   }, [selectedRecipientId]);
+
+  useFocusEffect(useCallback(() => { loadProfile(); }, [loadProfile]));
+
+  const pickImage = async () => {
+    // Request permission
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (!permissionResult.granted) {
+      Alert.alert('Permission Required', 'Please allow access to your photo library to change the profile picture.');
+      return;
+    }
+
+    // Launch image picker
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      uploadProfilePicture(result.assets[0].base64!);
+    }
+  };
+
+  const takePhoto = async () => {
+    // Request camera permission
+    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+    
+    if (!permissionResult.granted) {
+      Alert.alert('Permission Required', 'Please allow camera access to take a profile picture.');
+      return;
+    }
+
+    // Launch camera
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      uploadProfilePicture(result.assets[0].base64!);
+    }
+  };
+
+  const uploadProfilePicture = async (base64Image: string) => {
+    setUploadingPhoto(true);
+    try {
+      await api.patch(`/care-recipients/${selectedRecipientId}`, {
+        profile_picture: `data:image/jpeg;base64,${base64Image}`
+      });
+      await loadProfile();
+      Alert.alert('Success', 'Profile picture updated!');
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to upload picture');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const showPhotoOptions = () => {
+    Alert.alert(
+      'Change Profile Picture',
+      'Choose an option',
+      [
+        { text: 'Take Photo', onPress: takePhoto },
+        { text: 'Choose from Library', onPress: pickImage },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
 
   useFocusEffect(useCallback(() => { loadProfile(); }, [loadProfile]));
 
@@ -62,10 +138,24 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.profileCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{recipient.name?.charAt(0)?.toUpperCase()}</Text>
-          </View>
+          <TouchableOpacity onPress={showPhotoOptions} style={styles.avatarContainer} disabled={uploadingPhoto}>
+            {uploadingPhoto ? (
+              <View style={styles.avatar}>
+                <ActivityIndicator color={COLORS.white} />
+              </View>
+            ) : recipient.profile_picture ? (
+              <Image source={{ uri: recipient.profile_picture }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{recipient.name?.charAt(0)?.toUpperCase()}</Text>
+              </View>
+            )}
+            <View style={styles.cameraIcon}>
+              <Ionicons name="camera" size={14} color={COLORS.white} />
+            </View>
+          </TouchableOpacity>
           <Text style={styles.name}>{recipient.name}</Text>
+          <Text style={styles.tapHint}>Tap photo to change</Text>
           {recipient.notes ? <Text style={styles.bio}>{recipient.notes}</Text> : null}
         </View>
 
@@ -145,12 +235,33 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface, borderRadius: RADIUS.xl,
     shadowColor: COLORS.cardShadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 8, elevation: 3,
   },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: SPACING.sm,
+  },
   avatar: {
-    width: 80, height: 80, borderRadius: 40, backgroundColor: COLORS.primary,
-    justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.sm,
+    width: 100, height: 100, borderRadius: 50, backgroundColor: COLORS.primary,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  avatarImage: {
+    width: 100, height: 100, borderRadius: 50,
   },
   avatarText: { fontSize: FONT_SIZES.xxxl, fontWeight: '800', color: COLORS.white },
+  cameraIcon: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: COLORS.secondary,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: COLORS.surface,
+  },
   name: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.textPrimary },
+  tapHint: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2 },
   bio: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: 4, textAlign: 'center', paddingHorizontal: SPACING.lg },
   infoSection: { marginTop: SPACING.lg, paddingHorizontal: SPACING.lg },
   infoRow: {
