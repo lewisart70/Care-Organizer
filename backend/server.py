@@ -307,6 +307,7 @@ class LegalFinancialCreate(BaseModel):
     due_date: Optional[str] = None
     contact_person: Optional[str] = None
     notes: Optional[str] = None
+    image: Optional[str] = None  # Base64 encoded image
 
 class LegalFinancialOut(BaseModel):
     item_id: str
@@ -318,6 +319,7 @@ class LegalFinancialOut(BaseModel):
     due_date: Optional[str] = None
     contact_person: Optional[str] = None
     notes: Optional[str] = None
+    image: Optional[str] = None
 
 class MedicationInteractionRequest(BaseModel):
     medications: List[str]
