@@ -301,6 +301,21 @@ metadata:
         agent: "testing"
         comment: "✅ TESTED SUCCESSFULLY - POST /api/care-recipients/{recipient_id}/invite-caregiver endpoint working correctly. Successfully creates invite records, handles Resend free tier limitation gracefully (returns 200 OK with email_sent=false and informative email_note about domain verification). Proper validation (422 for invalid/missing email), authentication (401 without token), and authorization (404 for non-existent recipients). Response structure correct: message, invite_id (inv_ prefix), user_exists, email_sent, and email_note fields. All test scenarios passed."
 
+  - task: "Appointments API with Edit, Categories, and Vitals features"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented new appointments API features: categories (doctor/psw/grooming/footcare/respite/therapy/other), blood_pressure and weight vitals fields. Added comprehensive CRUD endpoints for creating, updating, listing, and deleting appointments with new fields."
+      - working: true
+        agent: "testing"
+        comment: "✅ APPOINTMENTS API TESTING COMPLETE - Comprehensive testing of all new features completed successfully. ALL 8 TESTS PASSED: 1) Create appointment with new fields (category, blood_pressure, weight) - ✅ PASSED 2) All category types (doctor/psw/grooming/footcare/respite/therapy/other) - ✅ PASSED 3) PUT update appointment with all fields - ✅ PASSED 4) GET list appointments with new fields visible - ✅ PASSED 5) DELETE appointment with success message - ✅ PASSED 6) Authentication required (401 without token) - ✅ PASSED 7) Access control (404 for non-existent recipients) - ✅ PASSED 8) Backwards compatibility (existing functionality still works) - ✅ PASSED. New vitals fields (blood_pressure, weight) persist correctly. All appointment categories work as expected. API is production-ready."
+
 test_plan:
   current_focus: []
   stuck_tasks: []
@@ -309,7 +324,7 @@ test_plan:
 
 agent_communication:
   - agent: "main"
-    message: "NEW: Test the DNR/POA PATCH endpoint: PATCH /api/care-recipients/{id}. This endpoint allows partial updates to care recipients, specifically for dnr_info and poa_info fields. Test flow: 1) Login, 2) Get care recipient ID, 3) PATCH with {dnr_info: {has_dnr: true, dnr_document_photo: 'base64...'}} - should return 200, 4) PATCH with {poa_info: {name: 'Test', phone: '555-1234'}} - should return 200, 5) GET the recipient and verify dnr_info and poa_info are persisted."
+    message: "NEW: Test Appointments Edit, Categories & Vitals features. Test endpoints: 1) POST /api/care-recipients/{id}/appointments - create with category (doctor/psw/grooming/footcare/respite/therapy/other), blood_pressure, weight fields. 2) PUT /api/care-recipients/{id}/appointments/{appt_id} - update all fields. 3) DELETE with confirmation. Verify: category, blood_pressure, weight persist correctly. Also test existing endpoints still work (GET list, transcribe, etc)."
   - agent: "main"
     message: "Implemented voice-to-text and profile photo features. Please test the backend endpoints first: POST /api/transcribe, POST /api/care-recipients/{id}/profile-photo, DELETE /api/care-recipients/{id}/profile-photo. Authentication is required - register a test user first."
   - agent: "testing"
@@ -326,3 +341,5 @@ agent_communication:
     message: "✅ CAREGIVER EMAIL INVITE TESTING COMPLETE - POST /api/care-recipients/{recipient_id}/invite-caregiver endpoint tested successfully and working correctly. Tested full flow: user registration → care recipient creation → invite caregiver. Endpoint properly handles Resend free tier limitations by returning 200 OK with email_sent=false and informative email_note about domain verification requirements. All validation working: invalid email format (422), missing email (422), authentication required (401), access control (404 for non-existent recipients). Response structure correct with invite_id (inv_ prefix), message, user_exists, email_sent, and email_note fields. No critical issues found."
   - agent: "testing"
     message: "✅ DNR/POA PARTIAL UPDATE ENDPOINT TESTING COMPLETE - PATCH /api/care-recipients/{id} endpoint tested comprehensively and working perfectly. ALL 6 TESTS PASSED: 1) DNR info partial update - Successfully updates dnr_info fields (has_dnr, document photo, dates, signatures) 2) POA info partial update - Successfully updates poa_info fields (name, relationship, phone, email, address) 3) Data persistence - Both DNR and POA information properly persist in database after updates 4) Authentication required - Returns 401 Unauthorized without valid token 5) Access control - Returns 404 Not Found for non-existent recipients 6) Field isolation - Only specified fields are updated, other existing data remains unchanged. Endpoint supports partial updates perfectly and is production-ready."
+  - agent: "testing"
+    message: "✅ APPOINTMENTS API WITH EDIT, CATEGORIES & VITALS TESTING COMPLETE - Comprehensive testing of all new appointments features completed successfully! ALL 8 TESTS PASSED: 1) POST /api/care-recipients/{id}/appointments with new fields (category, blood_pressure, weight) ✅ 2) All 6 category types work (doctor/psw/grooming/footcare/respite/therapy/other) ✅ 3) PUT /api/care-recipients/{id}/appointments/{id} update endpoint ✅ 4) GET /api/care-recipients/{id}/appointments list with new fields visible ✅ 5) DELETE /api/care-recipients/{id}/appointments/{id} with success confirmation ✅ 6) Authentication required (401 without token) ✅ 7) Access control (404 for non-existent recipients) ✅ 8) Backwards compatibility (existing functionality still works without new fields) ✅. New vitals fields (blood_pressure: '130/85', weight: '72.5 kg') persist correctly in database. All appointment categories tested and working. API is production-ready and fully functional."

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Backend Testing Script for FamilyCare Organizer App
-Tests the DNR/POA partial update endpoint (PATCH /api/care-recipients/{recipient_id})
+Tests the new Appointments API with Edit, Categories, and Vitals features
 """
 
 import asyncio
@@ -13,16 +13,17 @@ from typing import Dict, Optional
 # Backend URL from frontend/.env
 BACKEND_URL = "https://family-health-hub-22.preview.emergentagent.com/api"
 
-class FamilyCareAPITest:
+class AppointmentsAPITest:
     def __init__(self):
         self.base_url = BACKEND_URL
         self.auth_token = None
         self.test_user = {
-            "email": f"test_dnr_poa_{uuid.uuid4().hex[:8]}@example.com",
+            "email": f"test_appointments_{uuid.uuid4().hex[:8]}@example.com",
             "password": "TestPassword123!",
-            "name": "DNR POA Test User"
+            "name": "Appointments Test User"
         }
         self.care_recipient_id = None
+        self.appointment_id = None
         self.headers = {"Content-Type": "application/json"}
 
     def log(self, message: str):
@@ -55,22 +56,18 @@ class FamilyCareAPITest:
         """Create a test care recipient"""
         try:
             recipient_data = {
-                "name": "Eleanor Williams",
-                "date_of_birth": "1935-06-15",
+                "name": "Margaret Thompson",
+                "date_of_birth": "1938-03-22",
                 "gender": "female",
-                "address": "123 Maple Street, Toronto, ON",
-                "phone": "416-555-0123",
-                "medical_conditions": ["Diabetes Type 2", "Hypertension"],
-                "allergies": ["Penicillin", "Shellfish"],
-                "blood_type": "O+",
-                "weight": "68 kg",
-                "blood_pressure": "140/85",
-                "blood_pressure_date": "2024-01-15",
-                "health_card_number": "1234-567-890",
-                "insurance_info": "Blue Cross Extended Health",
-                "interests": ["Gardening", "Reading", "Knitting"],
-                "favorite_foods": ["Tea and biscuits", "Roast chicken"],
-                "notes": "Prefers morning appointments. Uses a walker for mobility."
+                "address": "789 Oak Street, Vancouver, BC",
+                "phone": "604-555-0987",
+                "medical_conditions": ["Arthritis", "High Blood Pressure", "Diabetes"],
+                "allergies": ["Sulfa drugs", "Peanuts"],
+                "blood_type": "A+",
+                "weight": "72 kg",
+                "blood_pressure": "135/80",
+                "health_card_number": "9876-543-210",
+                "notes": "Regular appointments needed for blood pressure monitoring and diabetes management."
             }
 
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -93,127 +90,243 @@ class FamilyCareAPITest:
             self.log(f"❌ Care recipient creation error: {str(e)}")
             return False
 
-    async def test_patch_dnr_info(self) -> bool:
-        """Test PATCH endpoint with DNR info only"""
+    async def test_create_appointment_with_new_fields(self) -> bool:
+        """Test POST /api/care-recipients/{recipient_id}/appointments - Create appointment with new fields"""
         try:
-            dnr_data = {
-                "dnr_info": {
-                    "has_dnr": True,
-                    "dnr_document_photo": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAACAAIDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=",
-                    "dnr_date": "2024-01-10",
-                    "doctor_signature": "Dr. Sarah Johnson",
-                    "witness_signature": "Mary Williams",
-                    "notes": "DNR wishes discussed with family and documented per patient's request."
-                }
+            appointment_data = {
+                "title": "Annual Physical Checkup",
+                "date": "2025-06-15",
+                "time": "10:00 AM",
+                "doctor_name": "Dr. Sarah Johnson",
+                "location": "Vancouver General Hospital - Medical Center",
+                "category": "doctor",
+                "blood_pressure": "130/85",
+                "weight": "72.5 kg",
+                "notes": "Routine annual physical - check blood pressure, diabetes management, and arthritis status"
             }
 
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.patch(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}",
-                    json=dnr_data,
+                response = await client.post(
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/appointments",
+                    json=appointment_data,
                     headers=self.headers
                 )
                 
                 if response.status_code == 200:
                     data = response.json()
-                    if "dnr_info" in data and data["dnr_info"]["has_dnr"] == True:
-                        self.log("✅ DNR info PATCH test PASSED")
-                        self.log(f"   DNR status: {data['dnr_info']['has_dnr']}")
-                        self.log(f"   DNR document photo: {'✓ Present' if data['dnr_info']['dnr_document_photo'] else '✗ Missing'}")
+                    self.appointment_id = data["appointment_id"]
+                    
+                    # Verify all new fields are present and correct
+                    category_correct = data.get("category") == "doctor"
+                    bp_correct = data.get("blood_pressure") == "130/85"
+                    weight_correct = data.get("weight") == "72.5 kg"
+                    
+                    if category_correct and bp_correct and weight_correct:
+                        self.log("✅ Create appointment with new fields PASSED")
+                        self.log(f"   Appointment ID: {self.appointment_id}")
+                        self.log(f"   Category: {data.get('category')}")
+                        self.log(f"   Blood Pressure: {data.get('blood_pressure')}")
+                        self.log(f"   Weight: {data.get('weight')}")
                         return True
                     else:
-                        self.log("❌ DNR info PATCH test FAILED - DNR info not properly updated")
+                        self.log("❌ Create appointment FAILED - New fields not properly saved")
+                        self.log(f"   Category correct: {'✓' if category_correct else '✗'}")
+                        self.log(f"   Blood pressure correct: {'✓' if bp_correct else '✗'}")
+                        self.log(f"   Weight correct: {'✓' if weight_correct else '✗'}")
                         return False
                 else:
-                    self.log(f"❌ DNR info PATCH test FAILED: {response.status_code} - {response.text}")
+                    self.log(f"❌ Create appointment FAILED: {response.status_code} - {response.text}")
                     return False
         except Exception as e:
-            self.log(f"❌ DNR info PATCH test error: {str(e)}")
+            self.log(f"❌ Create appointment error: {str(e)}")
             return False
 
-    async def test_patch_poa_info(self) -> bool:
-        """Test PATCH endpoint with POA info only"""
+    async def test_create_appointment_different_categories(self) -> bool:
+        """Test creating appointments with different category types"""
+        categories_to_test = [
+            ("psw", "Personal Support Worker Visit"),
+            ("grooming", "Hair Appointment"),
+            ("footcare", "Podiatrist - Nail Trim"),
+            ("respite", "Respite Care Day Program"),
+            ("therapy", "Physiotherapy Session"),
+            ("other", "Dental Cleaning")
+        ]
+        
         try:
-            poa_data = {
-                "poa_info": {
-                    "name": "Jane Williams Smith",
-                    "relationship": "Daughter",
-                    "phone": "555-123-4567",
-                    "email": "jane.williams.smith@example.com",
-                    "address": "456 Oak Avenue, Toronto, ON M4K 1B2",
-                    "type": "Power of Attorney for Health Care",
-                    "document_date": "2023-11-20",
-                    "notarized": True,
-                    "notes": "Primary contact for medical decisions. Lives close by and visits weekly."
+            all_passed = True
+            created_appointments = []
+            
+            for category, title in categories_to_test:
+                appointment_data = {
+                    "title": title,
+                    "date": "2025-07-01", 
+                    "time": "2:00 PM",
+                    "category": category,
+                    "notes": f"Testing {category} category appointment"
                 }
+
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        f"{self.base_url}/care-recipients/{self.care_recipient_id}/appointments",
+                        json=appointment_data,
+                        headers=self.headers
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get("category") == category:
+                            self.log(f"✅ Category '{category}' appointment created successfully")
+                            created_appointments.append(data["appointment_id"])
+                        else:
+                            self.log(f"❌ Category '{category}' not saved correctly")
+                            all_passed = False
+                    else:
+                        self.log(f"❌ Failed to create '{category}' appointment: {response.status_code}")
+                        all_passed = False
+
+            if all_passed:
+                self.log("✅ All category types test PASSED")
+                return True
+            else:
+                self.log("❌ Category types test FAILED")
+                return False
+                
+        except Exception as e:
+            self.log(f"❌ Category types test error: {str(e)}")
+            return False
+
+    async def test_update_appointment(self) -> bool:
+        """Test PUT /api/care-recipients/{recipient_id}/appointments/{appointment_id} - Update appointment"""
+        try:
+            if not self.appointment_id:
+                self.log("❌ Update test FAILED - No appointment ID available")
+                return False
+                
+            updated_data = {
+                "title": "UPDATED: Annual Physical + Blood Work",
+                "date": "2025-06-16", 
+                "time": "11:30 AM",
+                "doctor_name": "Dr. Sarah Johnson, MD",
+                "location": "Vancouver General Hospital - Lab & Medical Center",
+                "category": "doctor",
+                "blood_pressure": "128/82",
+                "weight": "71.8 kg",
+                "notes": "Updated appointment - added blood work and updated vitals from pre-visit"
             }
 
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.patch(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}",
-                    json=poa_data,
+                response = await client.put(
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/appointments/{self.appointment_id}",
+                    json=updated_data,
                     headers=self.headers
                 )
                 
                 if response.status_code == 200:
                     data = response.json()
-                    if "poa_info" in data and data["poa_info"]["name"] == "Jane Williams Smith":
-                        self.log("✅ POA info PATCH test PASSED")
-                        self.log(f"   POA name: {data['poa_info']['name']}")
-                        self.log(f"   Relationship: {data['poa_info']['relationship']}")
-                        self.log(f"   Phone: {data['poa_info']['phone']}")
-                        self.log(f"   Email: {data['poa_info']['email']}")
+                    
+                    # Verify all fields were updated correctly
+                    title_updated = data.get("title") == "UPDATED: Annual Physical + Blood Work"
+                    date_updated = data.get("date") == "2025-06-16"
+                    bp_updated = data.get("blood_pressure") == "128/82"
+                    weight_updated = data.get("weight") == "71.8 kg"
+                    
+                    if title_updated and date_updated and bp_updated and weight_updated:
+                        self.log("✅ Update appointment PASSED")
+                        self.log(f"   Updated title: {data.get('title')}")
+                        self.log(f"   Updated date: {data.get('date')}")
+                        self.log(f"   Updated blood pressure: {data.get('blood_pressure')}")
+                        self.log(f"   Updated weight: {data.get('weight')}")
                         return True
                     else:
-                        self.log("❌ POA info PATCH test FAILED - POA info not properly updated")
+                        self.log("❌ Update appointment FAILED - Fields not properly updated")
+                        self.log(f"   Title updated: {'✓' if title_updated else '✗'}")
+                        self.log(f"   Date updated: {'✓' if date_updated else '✗'}")
+                        self.log(f"   BP updated: {'✓' if bp_updated else '✗'}")
+                        self.log(f"   Weight updated: {'✓' if weight_updated else '✗'}")
                         return False
                 else:
-                    self.log(f"❌ POA info PATCH test FAILED: {response.status_code} - {response.text}")
+                    self.log(f"❌ Update appointment FAILED: {response.status_code} - {response.text}")
                     return False
         except Exception as e:
-            self.log(f"❌ POA info PATCH test error: {str(e)}")
+            self.log(f"❌ Update appointment error: {str(e)}")
             return False
 
-    async def test_persistence(self) -> bool:
-        """Verify persistence by getting the care recipient and checking both dnr_info and poa_info"""
+    async def test_list_appointments(self) -> bool:
+        """Test GET /api/care-recipients/{recipient_id}/appointments - List appointments"""
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}",
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/appointments",
                     headers=self.headers
                 )
                 
                 if response.status_code == 200:
                     data = response.json()
-                    
-                    # Check DNR info persistence
-                    dnr_ok = (
-                        "dnr_info" in data and 
-                        data["dnr_info"]["has_dnr"] == True and
-                        "dnr_document_photo" in data["dnr_info"]
-                    )
-                    
-                    # Check POA info persistence
-                    poa_ok = (
-                        "poa_info" in data and 
-                        data["poa_info"]["name"] == "Jane Williams Smith" and
-                        data["poa_info"]["relationship"] == "Daughter"
-                    )
-                    
-                    if dnr_ok and poa_ok:
-                        self.log("✅ Persistence test PASSED")
-                        self.log("   Both DNR and POA info are properly persisted")
-                        return True
+                    if isinstance(data, list) and len(data) > 0:
+                        # Find our test appointment
+                        test_appointment = None
+                        for appt in data:
+                            if appt.get("appointment_id") == self.appointment_id:
+                                test_appointment = appt
+                                break
+                        
+                        if test_appointment:
+                            # Verify new fields appear in the response
+                            has_category = "category" in test_appointment
+                            has_bp = "blood_pressure" in test_appointment
+                            has_weight = "weight" in test_appointment
+                            
+                            if has_category and has_bp and has_weight:
+                                self.log("✅ List appointments PASSED")
+                                self.log(f"   Found {len(data)} appointment(s)")
+                                self.log(f"   New fields present: category='{test_appointment.get('category')}', bp='{test_appointment.get('blood_pressure')}', weight='{test_appointment.get('weight')}'")
+                                return True
+                            else:
+                                self.log("❌ List appointments FAILED - New fields missing from response")
+                                self.log(f"   Has category: {'✓' if has_category else '✗'}")
+                                self.log(f"   Has blood_pressure: {'✓' if has_bp else '✗'}")
+                                self.log(f"   Has weight: {'✓' if has_weight else '✗'}")
+                                return False
+                        else:
+                            self.log("❌ List appointments FAILED - Test appointment not found in list")
+                            return False
                     else:
-                        self.log("❌ Persistence test FAILED")
-                        self.log(f"   DNR info persisted: {'✓' if dnr_ok else '✗'}")
-                        self.log(f"   POA info persisted: {'✓' if poa_ok else '✗'}")
+                        self.log("❌ List appointments FAILED - No appointments returned")
                         return False
                 else:
-                    self.log(f"❌ Persistence test FAILED: {response.status_code} - {response.text}")
+                    self.log(f"❌ List appointments FAILED: {response.status_code} - {response.text}")
                     return False
         except Exception as e:
-            self.log(f"❌ Persistence test error: {str(e)}")
+            self.log(f"❌ List appointments error: {str(e)}")
+            return False
+
+    async def test_delete_appointment(self) -> bool:
+        """Test DELETE /api/care-recipients/{recipient_id}/appointments/{appointment_id} - Delete appointment"""
+        try:
+            if not self.appointment_id:
+                self.log("❌ Delete test FAILED - No appointment ID available")
+                return False
+
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.delete(
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/appointments/{self.appointment_id}",
+                    headers=self.headers
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "message" in data and "deleted" in data["message"].lower():
+                        self.log("✅ Delete appointment PASSED")
+                        self.log(f"   Success message: {data['message']}")
+                        return True
+                    else:
+                        self.log("❌ Delete appointment FAILED - No proper success message")
+                        return False
+                else:
+                    self.log(f"❌ Delete appointment FAILED: {response.status_code} - {response.text}")
+                    return False
+        except Exception as e:
+            self.log(f"❌ Delete appointment error: {str(e)}")
             return False
 
     async def test_authentication_required(self) -> bool:
@@ -221,9 +334,9 @@ class FamilyCareAPITest:
         try:
             headers_no_auth = {"Content-Type": "application/json"}
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.patch(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}",
-                    json={"dnr_info": {"has_dnr": False}},
+                response = await client.post(
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/appointments",
+                    json={"title": "Test", "date": "2025-01-01"},
                     headers=headers_no_auth
                 )
                 
@@ -242,9 +355,8 @@ class FamilyCareAPITest:
         try:
             fake_recipient_id = f"cr_{uuid.uuid4().hex[:12]}"
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.patch(
-                    f"{self.base_url}/care-recipients/{fake_recipient_id}",
-                    json={"dnr_info": {"has_dnr": False}},
+                response = await client.get(
+                    f"{self.base_url}/care-recipients/{fake_recipient_id}/appointments",
                     headers=self.headers
                 )
                 
@@ -258,64 +370,50 @@ class FamilyCareAPITest:
             self.log(f"❌ Access control test error: {str(e)}")
             return False
 
-    async def test_only_specified_fields_updated(self) -> bool:
-        """Test that only specified fields are updated (other fields remain unchanged)"""
+    async def test_existing_functionality_still_works(self) -> bool:
+        """Test that existing appointment functionality still works without new fields"""
         try:
-            # First, get original data
+            # Create appointment with only legacy fields (no category, blood_pressure, weight)
+            legacy_appointment = {
+                "title": "Legacy Appointment Test",
+                "date": "2025-08-01",
+                "time": "3:00 PM",
+                "doctor_name": "Dr. Legacy Test",
+                "location": "Old Clinic",
+                "notes": "Testing backwards compatibility"
+            }
+
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}",
+                response = await client.post(
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/appointments",
+                    json=legacy_appointment,
                     headers=self.headers
                 )
                 
-                if response.status_code != 200:
-                    self.log(f"❌ Field isolation test FAILED - Could not get original data: {response.status_code}")
-                    return False
-                
-                original_data = response.json()
-                original_name = original_data.get("name")
-                original_phone = original_data.get("phone")
-                
-                # Update only medical_conditions
-                update_data = {
-                    "medical_conditions": ["Updated Condition Test"]
-                }
-                
-                response = await client.patch(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}",
-                    json=update_data,
-                    headers=self.headers
-                )
-                
-                if response.status_code != 200:
-                    self.log(f"❌ Field isolation test FAILED - PATCH failed: {response.status_code}")
-                    return False
-                
-                updated_data = response.json()
-                
-                # Verify only medical_conditions changed
-                name_unchanged = updated_data.get("name") == original_name
-                phone_unchanged = updated_data.get("phone") == original_phone
-                conditions_updated = updated_data.get("medical_conditions") == ["Updated Condition Test"]
-                
-                if name_unchanged and phone_unchanged and conditions_updated:
-                    self.log("✅ Field isolation test PASSED")
-                    self.log("   Only specified field was updated, other fields remained unchanged")
-                    return True
+                if response.status_code == 200:
+                    data = response.json()
+                    # Should work even without new fields
+                    title_correct = data.get("title") == "Legacy Appointment Test"
+                    has_id = "appointment_id" in data
+                    
+                    if title_correct and has_id:
+                        self.log("✅ Existing functionality test PASSED")
+                        self.log("   Legacy appointment created successfully without new fields")
+                        return True
+                    else:
+                        self.log("❌ Existing functionality test FAILED - Legacy appointment creation broken")
+                        return False
                 else:
-                    self.log("❌ Field isolation test FAILED")
-                    self.log(f"   Name unchanged: {'✓' if name_unchanged else '✗'}")
-                    self.log(f"   Phone unchanged: {'✓' if phone_unchanged else '✗'}")
-                    self.log(f"   Conditions updated: {'✓' if conditions_updated else '✗'}")
+                    self.log(f"❌ Existing functionality test FAILED: {response.status_code} - {response.text}")
                     return False
         except Exception as e:
-            self.log(f"❌ Field isolation test error: {str(e)}")
+            self.log(f"❌ Existing functionality test error: {str(e)}")
             return False
 
     async def run_all_tests(self):
-        """Run all DNR/POA PATCH endpoint tests"""
+        """Run all Appointments API tests"""
         self.log("=" * 80)
-        self.log("STARTING DNR/POA PARTIAL UPDATE ENDPOINT TESTS")
+        self.log("STARTING APPOINTMENTS API TESTS (Edit, Categories, Vitals)")
         self.log("=" * 80)
         
         test_results = []
@@ -330,33 +428,41 @@ class FamilyCareAPITest:
             self.log("❌ CRITICAL FAILURE: Could not create care recipient")
             return False
 
-        # 2. Test PATCH with DNR info only
-        self.log("\n2. TESTING PATCH with DNR info only...")
-        test_results.append(("DNR Info PATCH", await self.test_patch_dnr_info()))
+        # 2. Test creating appointment with new fields
+        self.log("\n2. TESTING POST /api/care-recipients/{id}/appointments with new fields...")
+        test_results.append(("Create Appointment (New Fields)", await self.test_create_appointment_with_new_fields()))
 
-        # 3. Test PATCH with POA info only
-        self.log("\n3. TESTING PATCH with POA info only...")
-        test_results.append(("POA Info PATCH", await self.test_patch_poa_info()))
+        # 3. Test different categories
+        self.log("\n3. TESTING all category types...")
+        test_results.append(("Category Types", await self.test_create_appointment_different_categories()))
 
-        # 4. Verify persistence
-        self.log("\n4. TESTING persistence...")
-        test_results.append(("Persistence", await self.test_persistence()))
+        # 4. Test updating appointment
+        self.log("\n4. TESTING PUT /api/care-recipients/{id}/appointments/{id} update...")
+        test_results.append(("Update Appointment", await self.test_update_appointment()))
 
-        # 5. Test authentication required
-        self.log("\n5. TESTING authentication requirement...")
+        # 5. Test listing appointments
+        self.log("\n5. TESTING GET /api/care-recipients/{id}/appointments list...")
+        test_results.append(("List Appointments", await self.test_list_appointments()))
+
+        # 6. Test authentication required
+        self.log("\n6. TESTING authentication requirement...")
         test_results.append(("Authentication Required", await self.test_authentication_required()))
 
-        # 6. Test access control
-        self.log("\n6. TESTING access control...")
+        # 7. Test access control
+        self.log("\n7. TESTING access control...")
         test_results.append(("Access Control", await self.test_access_control()))
 
-        # 7. Test field isolation
-        self.log("\n7. TESTING field isolation...")
-        test_results.append(("Field Isolation", await self.test_only_specified_fields_updated()))
+        # 8. Test existing functionality still works
+        self.log("\n8. TESTING backwards compatibility (existing functionality)...")
+        test_results.append(("Existing Functionality", await self.test_existing_functionality_still_works()))
+
+        # 9. Test delete appointment (do this last)
+        self.log("\n9. TESTING DELETE /api/care-recipients/{id}/appointments/{id}...")
+        test_results.append(("Delete Appointment", await self.test_delete_appointment()))
 
         # Summary
         self.log("\n" + "=" * 80)
-        self.log("TEST RESULTS SUMMARY")
+        self.log("APPOINTMENTS API TEST RESULTS SUMMARY")
         self.log("=" * 80)
         
         passed = 0
@@ -364,7 +470,7 @@ class FamilyCareAPITest:
         
         for test_name, result in test_results:
             status = "✅ PASSED" if result else "❌ FAILED"
-            self.log(f"{test_name:25} | {status}")
+            self.log(f"{test_name:35} | {status}")
             if result:
                 passed += 1
             else:
@@ -383,7 +489,7 @@ class FamilyCareAPITest:
 
 async def main():
     """Main test execution"""
-    tester = FamilyCareAPITest()
+    tester = AppointmentsAPITest()
     success = await tester.run_all_tests()
     return success
 
