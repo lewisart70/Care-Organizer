@@ -239,8 +239,11 @@ class AppointmentCreate(BaseModel):
     doctor_name: Optional[str] = None
     location: Optional[str] = None
     appointment_type: Optional[str] = None
+    category: Optional[str] = None  # psw, doctor, grooming, footcare, respite, other
     notes: Optional[str] = None
     reminder: Optional[bool] = True
+    blood_pressure: Optional[str] = None  # e.g., "120/80"
+    weight: Optional[str] = None  # e.g., "150 lbs"
 
 class AppointmentOut(BaseModel):
     appointment_id: str
@@ -251,8 +254,11 @@ class AppointmentOut(BaseModel):
     doctor_name: Optional[str] = None
     location: Optional[str] = None
     appointment_type: Optional[str] = None
+    category: Optional[str] = None
     notes: Optional[str] = None
     reminder: Optional[bool] = True
+    blood_pressure: Optional[str] = None
+    weight: Optional[str] = None
 
 class DailyRoutineCreate(BaseModel):
     time_of_day: str
@@ -1027,6 +1033,21 @@ async def delete_appointment(recipient_id: str, appointment_id: str, user: dict 
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Appointment not found")
     return {"message": "Appointment deleted"}
+
+@api_router.put("/care-recipients/{recipient_id}/appointments/{appointment_id}")
+async def update_appointment(recipient_id: str, appointment_id: str, data: AppointmentCreate, user: dict = Depends(get_current_user)):
+    r = await db.care_recipients.find_one({"recipient_id": recipient_id, "caregivers": user["user_id"]})
+    if not r:
+        raise HTTPException(status_code=404, detail="Care recipient not found")
+    existing = await db.appointments.find_one({"appointment_id": appointment_id, "recipient_id": recipient_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    await db.appointments.update_one(
+        {"appointment_id": appointment_id, "recipient_id": recipient_id},
+        {"$set": data.dict()}
+    )
+    updated = await db.appointments.find_one({"appointment_id": appointment_id}, {"_id": 0})
+    return updated
 
 # ======================== DAILY ROUTINE ROUTES ========================
 

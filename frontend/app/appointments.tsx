@@ -8,13 +8,29 @@ import { useAuth } from '../src/context/AuthContext';
 import { api } from '../src/utils/api';
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../src/constants/theme';
 
+// Appointment categories
+const CATEGORIES = [
+  { id: 'doctor', label: 'Doctor', icon: 'medkit', color: COLORS.primary },
+  { id: 'psw', label: 'PSW', icon: 'person', color: COLORS.secondary },
+  { id: 'grooming', label: 'Grooming', icon: 'cut', color: '#9C27B0' },
+  { id: 'footcare', label: 'Foot Care', icon: 'footsteps', color: '#FF9800' },
+  { id: 'respite', label: 'Respite', icon: 'home', color: '#4CAF50' },
+  { id: 'therapy', label: 'Therapy', icon: 'fitness', color: '#00BCD4' },
+  { id: 'other', label: 'Other', icon: 'ellipsis-horizontal', color: COLORS.textSecondary },
+];
+
 export default function AppointmentsScreen() {
   const { selectedRecipientId } = useAuth();
   const router = useRouter();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ title: '', date: '', time: '', doctor_name: '', location: '', appointment_type: '', notes: '' });
+  const [editingAppt, setEditingAppt] = useState<any>(null);
+  const [form, setForm] = useState({ 
+    title: '', date: '', time: '', doctor_name: '', location: '', 
+    appointment_type: '', category: '', notes: '', 
+    blood_pressure: '', weight: '' 
+  });
   const [saving, setSaving] = useState(false);
   
   // Voice recording state
@@ -34,6 +50,31 @@ export default function AppointmentsScreen() {
     catch (e) { console.error(e); } finally { setLoading(false); }
   }, [selectedRecipientId]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const openAddModal = () => {
+    setEditingAppt(null);
+    setForm({ title: '', date: '', time: '', doctor_name: '', location: '', appointment_type: '', category: '', notes: '', blood_pressure: '', weight: '' });
+    setTranscript('');
+    setShowAdd(true);
+  };
+
+  const openEditModal = (appt: any) => {
+    setEditingAppt(appt);
+    setForm({
+      title: appt.title || '',
+      date: appt.date || '',
+      time: appt.time || '',
+      doctor_name: appt.doctor_name || '',
+      location: appt.location || '',
+      appointment_type: appt.appointment_type || '',
+      category: appt.category || '',
+      notes: appt.notes || '',
+      blood_pressure: appt.blood_pressure || '',
+      weight: appt.weight || '',
+    });
+    setTranscript('');
+    setShowAdd(true);
+  };
 
   const startRecording = async () => {
     try {
@@ -118,17 +159,48 @@ export default function AppointmentsScreen() {
     }
   };
 
-  const handleAdd = async () => {
+  const handleSave = async () => {
     if (!form.title.trim() || !form.date.trim()) { Alert.alert('Required', 'Title and date are required'); return; }
     setSaving(true);
     try { 
-      await api.post(`/care-recipients/${selectedRecipientId}/appointments`, form); 
+      if (editingAppt) {
+        await api.put(`/care-recipients/${selectedRecipientId}/appointments/${editingAppt.appointment_id}`, form);
+        Alert.alert('Updated', 'Appointment updated successfully');
+      } else {
+        await api.post(`/care-recipients/${selectedRecipientId}/appointments`, form); 
+      }
       setShowAdd(false); 
-      setForm({ title: '', date: '', time: '', doctor_name: '', location: '', appointment_type: '', notes: '' }); 
+      setEditingAppt(null);
+      setForm({ title: '', date: '', time: '', doctor_name: '', location: '', appointment_type: '', category: '', notes: '', blood_pressure: '', weight: '' }); 
       setTranscript('');
       await load(); 
     }
     catch (e: any) { Alert.alert('Error', e.message); } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (apptId: string, title: string) => {
+    Alert.alert(
+      'Delete Appointment',
+      `Are you sure you want to delete "${title}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try { 
+              await api.del(`/care-recipients/${selectedRecipientId}/appointments/${apptId}`); 
+              await load(); 
+            }
+            catch (e: any) { Alert.alert('Error', e.message); }
+          }
+        }
+      ]
+    );
+  };
+
+  const getCategoryInfo = (categoryId: string) => {
+    return CATEGORIES.find(c => c.id === categoryId) || CATEGORIES[CATEGORIES.length - 1];
   };
 
   return (
@@ -136,7 +208,7 @@ export default function AppointmentsScreen() {
       <View style={s.header}>
         <TouchableOpacity testID="back-appts" onPress={() => router.back()}><Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} /></TouchableOpacity>
         <Text style={s.title}>Appointments</Text>
-        <TouchableOpacity testID="add-appt-btn" onPress={() => setShowAdd(true)}><Ionicons name="add-circle" size={28} color={COLORS.primary} /></TouchableOpacity>
+        <TouchableOpacity testID="add-appt-btn" onPress={openAddModal}><Ionicons name="add-circle" size={28} color={COLORS.primary} /></TouchableOpacity>
       </View>
       
       {/* Pro Tip Section */}
@@ -155,29 +227,72 @@ export default function AppointmentsScreen() {
         {loading ? <ActivityIndicator color={COLORS.primary} style={{ marginTop: SPACING.xl }} /> :
           items.length === 0 ? (
             <View style={s.empty}><Ionicons name="calendar-outline" size={48} color={COLORS.primaryLight} /><Text style={s.emptyTitle}>No appointments</Text></View>
-          ) : items.map(a => (
-            <View key={a.appointment_id} style={s.card}>
-              <View style={s.row}>
-                <View style={s.dateBox}><Ionicons name="calendar" size={20} color={COLORS.primary} /><Text style={s.dateText}>{a.date}</Text></View>
-                <TouchableOpacity testID={`del-appt-${a.appointment_id}`} onPress={async () => { await api.del(`/care-recipients/${selectedRecipientId}/appointments/${a.appointment_id}`); load(); }}>
-                  <Ionicons name="trash-outline" size={18} color={COLORS.error} /></TouchableOpacity>
-              </View>
-              <Text style={s.cardTitle}>{a.title}</Text>
-              {a.time && <Text style={s.cardSub}><Ionicons name="time-outline" size={14} /> {a.time}</Text>}
-              {a.doctor_name && <Text style={s.cardSub}><Ionicons name="person-outline" size={14} /> Dr. {a.doctor_name}</Text>}
-              {a.location && <Text style={s.cardSub}><Ionicons name="location-outline" size={14} /> {a.location}</Text>}
-              {a.notes && <Text style={s.cardNotes} numberOfLines={3}>{a.notes}</Text>}
-            </View>
-          ))}
+          ) : items.map(a => {
+            const cat = getCategoryInfo(a.category);
+            return (
+              <TouchableOpacity key={a.appointment_id} style={[s.card, { borderLeftColor: cat.color }]} onPress={() => openEditModal(a)} activeOpacity={0.7}>
+                <View style={s.row}>
+                  <View style={s.dateBox}>
+                    <Ionicons name="calendar" size={20} color={COLORS.primary} />
+                    <Text style={s.dateText}>{a.date}</Text>
+                  </View>
+                  <View style={s.cardActions}>
+                    <TouchableOpacity testID={`edit-appt-${a.appointment_id}`} style={s.actionBtn} onPress={() => openEditModal(a)}>
+                      <Ionicons name="pencil" size={16} color={COLORS.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity testID={`del-appt-${a.appointment_id}`} style={s.actionBtn} onPress={() => handleDelete(a.appointment_id, a.title)}>
+                      <Ionicons name="trash-outline" size={16} color={COLORS.error} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                
+                {/* Category Badge */}
+                {a.category && (
+                  <View style={[s.categoryBadge, { backgroundColor: cat.color + '20' }]}>
+                    <Ionicons name={cat.icon as any} size={12} color={cat.color} />
+                    <Text style={[s.categoryText, { color: cat.color }]}>{cat.label}</Text>
+                  </View>
+                )}
+                
+                <Text style={s.cardTitle}>{a.title}</Text>
+                {a.time && <Text style={s.cardSub}><Ionicons name="time-outline" size={14} /> {a.time}</Text>}
+                {a.doctor_name && <Text style={s.cardSub}><Ionicons name="person-outline" size={14} /> Dr. {a.doctor_name}</Text>}
+                {a.location && <Text style={s.cardSub}><Ionicons name="location-outline" size={14} /> {a.location}</Text>}
+                
+                {/* Vitals if recorded */}
+                {(a.blood_pressure || a.weight) && (
+                  <View style={s.vitalsRow}>
+                    {a.blood_pressure && (
+                      <View style={s.vitalChip}>
+                        <Ionicons name="heart" size={12} color={COLORS.error} />
+                        <Text style={s.vitalText}>BP: {a.blood_pressure}</Text>
+                      </View>
+                    )}
+                    {a.weight && (
+                      <View style={s.vitalChip}>
+                        <Ionicons name="scale" size={12} color={COLORS.secondary} />
+                        <Text style={s.vitalText}>{a.weight}</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+                
+                {a.notes && <Text style={s.cardNotes} numberOfLines={3}>{a.notes}</Text>}
+                <View style={s.editHint}>
+                  <Text style={s.editHintText}>Tap to edit</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
       </ScrollView>
       
-      {/* Add Appointment Modal */}
+      {/* Add/Edit Appointment Modal */}
       <Modal visible={showAdd} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={s.modal}>
           <View style={s.mHeader}>
-            <TouchableOpacity onPress={() => { setShowAdd(false); setTranscript(''); }}><Text style={s.cancel}>Cancel</Text></TouchableOpacity>
-            <Text style={s.mTitle}>Add Appointment</Text>
-            <TouchableOpacity testID="save-appt-btn" onPress={handleAdd} disabled={saving}>{saving ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Text style={s.save}>Save</Text>}</TouchableOpacity>
+            <TouchableOpacity onPress={() => { setShowAdd(false); setEditingAppt(null); setTranscript(''); }}><Text style={s.cancel}>Cancel</Text></TouchableOpacity>
+            <Text style={s.mTitle}>{editingAppt ? 'Edit Appointment' : 'Add Appointment'}</Text>
+            <TouchableOpacity testID="save-appt-btn" onPress={handleSave} disabled={saving}>{saving ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Text style={s.save}>Save</Text>}</TouchableOpacity>
           </View>
           <ScrollView style={s.mBody} keyboardShouldPersistTaps="handled">
             {/* Voice Recording Tip */}
@@ -188,8 +303,55 @@ export default function AppointmentsScreen() {
               </Text>
             </View>
             
-            {[{ k: 'title', l: 'Title *', p: 'e.g., Cardiology checkup' },{ k: 'date', l: 'Date *', p: 'YYYY-MM-DD' },{ k: 'time', l: 'Time', p: 'e.g., 10:00 AM' },{ k: 'doctor_name', l: 'Doctor', p: 'Doctor name' },{ k: 'location', l: 'Location', p: 'Clinic address' },{ k: 'appointment_type', l: 'Type', p: 'e.g., Follow-up' }].map(({ k, l, p }) => (
+            {/* Category Selector */}
+            <View style={s.fg}>
+              <Text style={s.fl}>Category</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.categoryScroll}>
+                {CATEGORIES.map(cat => (
+                  <TouchableOpacity 
+                    key={cat.id}
+                    style={[s.categoryOption, form.category === cat.id && { backgroundColor: cat.color + '20', borderColor: cat.color }]}
+                    onPress={() => setForm({ ...form, category: cat.id })}
+                  >
+                    <Ionicons name={cat.icon as any} size={18} color={form.category === cat.id ? cat.color : COLORS.textSecondary} />
+                    <Text style={[s.categoryOptionText, form.category === cat.id && { color: cat.color }]}>{cat.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+            
+            {[{ k: 'title', l: 'Title *', p: 'e.g., Cardiology checkup' },{ k: 'date', l: 'Date *', p: 'YYYY-MM-DD' },{ k: 'time', l: 'Time', p: 'e.g., 10:00 AM' },{ k: 'doctor_name', l: 'Doctor/Provider', p: 'Name of doctor or provider' },{ k: 'location', l: 'Location', p: 'Clinic address' }].map(({ k, l, p }) => (
               <View key={k} style={s.fg}><Text style={s.fl}>{l}</Text><TextInput testID={`appt-${k}`} style={s.fi} placeholder={p} placeholderTextColor={COLORS.border} value={(form as any)[k]} onChangeText={v => setForm({ ...form, [k]: v })} /></View>))}
+            
+            {/* Vitals Section */}
+            <View style={s.vitalsSection}>
+              <Text style={s.sectionTitle}>Vitals (Optional)</Text>
+              <Text style={s.sectionSubtitle}>Record blood pressure and weight from this appointment</Text>
+              <View style={s.vitalsInputRow}>
+                <View style={s.vitalInputGroup}>
+                  <Text style={s.fl}>Blood Pressure</Text>
+                  <TextInput 
+                    testID="appt-blood_pressure"
+                    style={s.fi} 
+                    placeholder="e.g., 120/80" 
+                    placeholderTextColor={COLORS.border} 
+                    value={form.blood_pressure} 
+                    onChangeText={v => setForm({ ...form, blood_pressure: v })} 
+                  />
+                </View>
+                <View style={s.vitalInputGroup}>
+                  <Text style={s.fl}>Weight</Text>
+                  <TextInput 
+                    testID="appt-weight"
+                    style={s.fi} 
+                    placeholder="e.g., 150 lbs" 
+                    placeholderTextColor={COLORS.border} 
+                    value={form.weight} 
+                    onChangeText={v => setForm({ ...form, weight: v })} 
+                  />
+                </View>
+              </View>
+            </View>
             
             {/* Voice Recording Section */}
             <View style={s.voiceSection}>
@@ -340,9 +502,50 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dateBox: { flexDirection: 'row', alignItems: 'center' },
   dateText: { fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: '600', marginLeft: 4 },
+  cardActions: { flexDirection: 'row', gap: SPACING.sm },
+  actionBtn: { padding: SPACING.xs, borderRadius: RADIUS.md },
   cardTitle: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary, marginTop: 4 },
   cardSub: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
   cardNotes: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: SPACING.sm, fontStyle: 'italic', backgroundColor: COLORS.background, padding: SPACING.sm, borderRadius: RADIUS.md },
+  editHint: { alignItems: 'flex-end', marginTop: SPACING.xs },
+  editHintText: { fontSize: FONT_SIZES.xs, color: COLORS.border, fontStyle: 'italic' },
+  
+  // Category badge styles
+  categoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: RADIUS.full,
+    marginTop: SPACING.xs,
+    gap: 4,
+  },
+  categoryText: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
+  },
+  
+  // Vitals in card
+  vitalsRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginTop: SPACING.sm,
+  },
+  vitalChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: RADIUS.md,
+    gap: 4,
+  },
+  vitalText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textPrimary,
+    fontWeight: '600',
+  },
   
   modal: { flex: 1, backgroundColor: COLORS.background },
   mHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.border },
@@ -366,6 +569,57 @@ const s = StyleSheet.create({
     fontSize: FONT_SIZES.xs,
     color: COLORS.secondary,
     fontWeight: '600',
+  },
+  
+  // Category selector styles
+  categoryScroll: {
+    flexGrow: 0,
+    marginTop: SPACING.xs,
+  },
+  categoryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    marginRight: SPACING.sm,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    gap: 6,
+  },
+  categoryOptionText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  
+  // Vitals section in modal
+  vitalsSection: {
+    marginBottom: SPACING.md,
+    padding: SPACING.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+  },
+  sectionTitle: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 2,
+  },
+  sectionSubtitle: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.sm,
+  },
+  vitalsInputRow: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+  },
+  vitalInputGroup: {
+    flex: 1,
   },
   
   fg: { marginBottom: SPACING.md }, 
