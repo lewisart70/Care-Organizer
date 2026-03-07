@@ -363,15 +363,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg, marginTop: SPACING.md, marginBottom: SPACING.sm,
   },
   actionsRow: {
-    flexDirection: 'row', paddingHorizontal: SPACING.lg,
+    flexDirection: 'row', paddingHorizontal: SPACING.md,
     justifyContent: 'space-between', marginBottom: SPACING.md,
   },
-  actionBtn: { alignItems: 'center', width: '23%' },
+  actionBtn: { alignItems: 'center', width: '24%' },
   actionIcon: {
     width: 52, height: 52, borderRadius: RADIUS.lg,
     justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.xs,
   },
-  actionLabel: { fontSize: FONT_SIZES.xs, fontWeight: '600', color: COLORS.textSecondary },
+  actionLabel: { fontSize: 10, fontWeight: '600', color: COLORS.textSecondary, textAlign: 'center' },
   reminderSection: { paddingHorizontal: SPACING.lg, marginBottom: SPACING.md },
   reminderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   aiBtn: {
