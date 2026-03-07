@@ -56,6 +56,20 @@ class ApiClient {
     return res.json();
   }
 
+  async patch(path: string, body?: any) {
+    const res = await fetch(`${BACKEND_URL}/api${path}`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Request failed' }));
+      throw new Error(err.detail || 'Request failed');
+    }
+    return res.json();
+  }
+
   async del(path: string) {
     const res = await fetch(`${BACKEND_URL}/api${path}`, {
       method: 'DELETE',

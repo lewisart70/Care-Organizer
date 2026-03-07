@@ -501,6 +501,38 @@ async def update_care_recipient(recipient_id: str, data: CareRecipientCreate, us
     updated = await db.care_recipients.find_one({"recipient_id": recipient_id}, {"_id": 0})
     return updated
 
+@api_router.patch("/care-recipients/{recipient_id}")
+async def partial_update_care_recipient(recipient_id: str, request: Request, user: dict = Depends(get_current_user)):
+    """Partial update - only updates the fields provided in the request body."""
+    r = await db.care_recipients.find_one({"recipient_id": recipient_id, "caregivers": user["user_id"]})
+    if not r:
+        raise HTTPException(status_code=404, detail="Care recipient not found")
+    
+    body = await request.json()
+    
+    # Only update fields that are provided
+    update_data = {}
+    allowed_fields = [
+        'name', 'date_of_birth', 'gender', 'address', 'phone',
+        'medical_conditions', 'allergies', 'blood_type', 'weight',
+        'blood_pressure', 'blood_pressure_date', 'health_card_number',
+        'insurance_info', 'interests', 'favorite_foods', 'favorite_meals',
+        'notes', 'dnr_info', 'poa_info', 'profile_photo'
+    ]
+    
+    for field in allowed_fields:
+        if field in body:
+            update_data[field] = body[field]
+    
+    if update_data:
+        await db.care_recipients.update_one(
+            {"recipient_id": recipient_id},
+            {"$set": update_data}
+        )
+    
+    updated = await db.care_recipients.find_one({"recipient_id": recipient_id}, {"_id": 0})
+    return updated
+
 @api_router.post("/care-recipients/{recipient_id}/invite")
 async def invite_caregiver(recipient_id: str, data: InviteCaregiverRequest, user: dict = Depends(get_current_user)):
     r = await db.care_recipients.find_one({"recipient_id": recipient_id, "caregivers": user["user_id"]})

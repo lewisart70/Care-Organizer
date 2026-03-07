@@ -135,7 +135,7 @@ export default function EmergencyContactsScreen() {
   const saveDnrInfo = async () => {
     setSavingDnr(true);
     try {
-      await api.put(`/care-recipients/${selectedRecipientId}`, { dnr_info: dnrInfo });
+      await api.patch(`/care-recipients/${selectedRecipientId}`, { dnr_info: dnrInfo });
       setShowDnrModal(false);
       Alert.alert('Saved', 'DNR information has been updated');
     } catch (e: any) { Alert.alert('Error', e.message); }
@@ -145,7 +145,7 @@ export default function EmergencyContactsScreen() {
   const savePoaInfo = async () => {
     setSavingPoa(true);
     try {
-      await api.put(`/care-recipients/${selectedRecipientId}`, { poa_info: poaInfo });
+      await api.patch(`/care-recipients/${selectedRecipientId}`, { poa_info: poaInfo });
       setShowPoaModal(false);
       Alert.alert('Saved', 'Power of Attorney information has been updated');
     } catch (e: any) { Alert.alert('Error', e.message); }

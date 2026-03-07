@@ -1,449 +1,392 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script for Caregiver Connect App
-Tests the AI appointment summarization endpoint as requested.
+Backend Testing Script for FamilyCare Organizer App
+Tests the DNR/POA partial update endpoint (PATCH /api/care-recipients/{recipient_id})
 """
 
+import asyncio
 import httpx
 import json
-import asyncio
-import sys
-from datetime import datetime
+import uuid
+from typing import Dict, Optional
 
-# Configuration
-BASE_URL = "https://family-health-hub-22.preview.emergentagent.com/api"
-TEST_USER = {
-    "email": "testuser2@example.com", 
-    "password": "TestPass123", 
-    "name": "Test User 2"
-}
+# Backend URL from frontend/.env
+BACKEND_URL = "https://family-health-hub-22.preview.emergentagent.com/api"
 
-class APITester:
+class FamilyCareAPITest:
     def __init__(self):
-        self.client = httpx.AsyncClient(timeout=30.0)
+        self.base_url = BACKEND_URL
         self.auth_token = None
-        
-    async def cleanup(self):
-        await self.client.aclose()
-    
-    def log(self, message, level="INFO"):
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{timestamp}] {level}: {message}")
-    
-    async def register_user(self):
-        """Register a new test user or login if already exists."""
-        try:
-            # Try to register first
-            response = await self.client.post(
-                f"{BASE_URL}/auth/register",
-                json=TEST_USER
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.auth_token = data["token"]
-                self.log(f"✅ User registered successfully: {data['user']['name']}")
-                return True
-            elif response.status_code == 400 and "already registered" in response.text:
-                # User exists, try to login
-                self.log("User already exists, attempting login...")
-                return await self.login_user()
-            else:
-                self.log(f"❌ Registration failed: {response.status_code} - {response.text}", "ERROR")
-                return False
-                
-        except Exception as e:
-            self.log(f"❌ Registration error: {str(e)}", "ERROR")
-            return False
-    
-    async def login_user(self):
-        """Login with existing user credentials."""
-        try:
-            response = await self.client.post(
-                f"{BASE_URL}/auth/login",
-                json={
-                    "email": TEST_USER["email"],
-                    "password": TEST_USER["password"]
-                }
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.auth_token = data["token"]
-                self.log(f"✅ User logged in successfully: {data['user']['name']}")
-                return True
-            else:
-                self.log(f"❌ Login failed: {response.status_code} - {response.text}", "ERROR")
-                return False
-                
-        except Exception as e:
-            self.log(f"❌ Login error: {str(e)}", "ERROR")
-            return False
-    
-    def get_headers(self):
-        """Get authentication headers."""
-        return {"Authorization": f"Bearer {self.auth_token}"}
-    
-    async def test_ai_summarize_appointment(self):
-        """Test the AI appointment summarization endpoint."""
-        self.log("Testing AI appointment summarization endpoint...")
-        
-        test_data = {
-            "transcript": "Doctor: Good morning, how are you feeling today? Patient: I've been having some chest pain and shortness of breath. Doctor: Let me check your blood pressure. It's a bit elevated at 150 over 90. I'm going to prescribe you Lisinopril 10mg once daily for the blood pressure. For the chest pain, let's do an EKG next week. Make sure to reduce your sodium intake and try to walk 30 minutes daily. Come back in 2 weeks for a follow-up.",
-            "appointment_title": "Cardiology Checkup"
+        self.test_user = {
+            "email": f"test_dnr_poa_{uuid.uuid4().hex[:8]}@example.com",
+            "password": "TestPassword123!",
+            "name": "DNR POA Test User"
         }
-        
+        self.care_recipient_id = None
+        self.headers = {"Content-Type": "application/json"}
+
+    def log(self, message: str):
+        print(f"[TEST] {message}")
+
+    async def register_user(self) -> bool:
+        """Register a test user"""
         try:
-            response = await self.client.post(
-                f"{BASE_URL}/ai/summarize-appointment",
-                json=test_data,
-                headers=self.get_headers()
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.log("✅ AI summarization endpoint working correctly")
-                self.log(f"Response contains: {list(data.keys())}")
-                
-                # Check response structure
-                if "summary" in data and "success" in data:
-                    self.log("✅ Response has expected structure (summary, success)")
-                    if data.get("success"):
-                        self.log("✅ Success flag is True")
-                        
-                        # Log the summary content (truncated for readability)
-                        summary = data.get("summary", "")
-                        if summary:
-                            self.log("✅ Summary content generated successfully")
-                            # Show first 200 characters of summary
-                            summary_preview = summary[:200] + "..." if len(summary) > 200 else summary
-                            self.log(f"Summary preview: {summary_preview}")
-                            
-                            # Check if summary contains key medical info
-                            medical_keywords = ["blood pressure", "medication", "lisinopril", "ekg", "follow-up", "chest pain"]
-                            found_keywords = [kw for kw in medical_keywords if kw.lower() in summary.lower()]
-                            if found_keywords:
-                                self.log(f"✅ Summary contains medical keywords: {found_keywords}")
-                            else:
-                                self.log("⚠️ Summary may not contain expected medical keywords", "WARN")
-                        else:
-                            self.log("❌ Summary is empty", "ERROR")
-                            return False
-                    else:
-                        self.log("❌ Success flag is False", "ERROR")
-                        return False
-                else:
-                    self.log(f"❌ Unexpected response structure: {data}", "ERROR")
-                    return False
-                
-                return True
-            else:
-                self.log(f"❌ AI summarization failed: {response.status_code} - {response.text}", "ERROR")
-                return False
-                
-        except Exception as e:
-            self.log(f"❌ AI summarization test error: {str(e)}", "ERROR")
-            return False
-    
-    async def test_authentication_required(self):
-        """Test that the endpoint requires authentication."""
-        self.log("Testing authentication requirement...")
-        
-        test_data = {
-            "transcript": "Test transcript",
-            "appointment_title": "Test"
-        }
-        
-        try:
-            # Test without token
-            response = await self.client.post(
-                f"{BASE_URL}/ai/summarize-appointment",
-                json=test_data
-            )
-            
-            if response.status_code == 401:
-                self.log("✅ Endpoint correctly requires authentication")
-                return True
-            else:
-                self.log(f"❌ Endpoint should require auth but returned: {response.status_code}", "ERROR")
-                return False
-                
-        except Exception as e:
-            self.log(f"❌ Auth test error: {str(e)}", "ERROR")
-            return False
-    
-    async def test_invalid_data_handling(self):
-        """Test how the endpoint handles invalid data."""
-        self.log("Testing invalid data handling...")
-        
-        # Test with empty transcript
-        test_cases = [
-            {"transcript": "", "appointment_title": "Test"},
-            {"transcript": "   ", "appointment_title": "Test"},
-            {"appointment_title": "Test"}  # Missing transcript
-        ]
-        
-        for i, test_data in enumerate(test_cases):
-            try:
-                response = await self.client.post(
-                    f"{BASE_URL}/ai/summarize-appointment",
-                    json=test_data,
-                    headers=self.get_headers()
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{self.base_url}/auth/register",
+                    json=self.test_user,
+                    headers=self.headers
                 )
                 
-                self.log(f"Test case {i+1}: Status {response.status_code}")
-                
-                # Should either handle gracefully or return appropriate error
-                if response.status_code in [400, 422, 500]:
-                    self.log(f"✅ Test case {i+1}: Properly handles invalid data")
-                elif response.status_code == 200:
+                if response.status_code == 200:
                     data = response.json()
-                    if data.get("success") == False:
-                        self.log(f"✅ Test case {i+1}: Returns success=false for invalid data")
-                    else:
-                        self.log(f"⚠️ Test case {i+1}: Processes invalid data without error", "WARN")
-                        
-            except Exception as e:
-                self.log(f"❌ Test case {i+1} error: {str(e)}", "ERROR")
-        
-        return True
-
-    async def create_test_care_recipient(self):
-        """Create a care recipient for testing invites."""
-        if not self.auth_token:
-            self.log("❌ No auth token available", "ERROR")
-            return None
-
-        care_recipient_data = {
-            "name": "John Doe",
-            "date_of_birth": "1950-05-15",
-            "gender": "Male",
-            "address": "123 Main St, Anytown, USA",
-            "phone": "555-123-4567",
-            "medical_conditions": ["Diabetes", "Hypertension"],
-            "allergies": ["Penicillin", "Nuts"],
-            "blood_type": "A+"
-        }
-
-        try:
-            response = await self.client.post(
-                f"{BASE_URL}/care-recipients",
-                json=care_recipient_data,
-                headers={"Authorization": f"Bearer {self.auth_token}"}
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                recipient_id = data.get("recipient_id")
-                self.log(f"✅ Care recipient created: {recipient_id}")
-                return recipient_id
-            else:
-                self.log(f"❌ Care recipient creation failed: {response.status_code} - {response.text}", "ERROR")
-                return None
-                
-        except Exception as e:
-            self.log(f"❌ Care recipient creation error: {str(e)}", "ERROR")
-            return None
-
-    async def test_caregiver_invite(self):
-        """Test the caregiver email invite endpoint."""
-        self.log("\n--- Testing Caregiver Email Invite Endpoint ---")
-        
-        # Create a care recipient first
-        recipient_id = await self.create_test_care_recipient()
-        if not recipient_id:
-            return False
-
-        invite_data = {
-            "email": "invite_test@example.com",
-            "caregiver_name": "Test Caregiver",
-            "message": "Please help with care"
-        }
-
-        try:
-            # Test successful invite
-            response = await self.client.post(
-                f"{BASE_URL}/care-recipients/{recipient_id}/invite-caregiver",
-                json=invite_data,
-                headers={"Authorization": f"Bearer {self.auth_token}"}
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Verify response structure
-                required_fields = ["message", "invite_id", "user_exists", "email_sent"]
-                missing_fields = [field for field in required_fields if field not in data]
-                
-                if missing_fields:
-                    self.log(f"❌ Missing response fields: {missing_fields}", "ERROR")
-                    return False
-                
-                # Verify invite_id format
-                invite_id = data.get("invite_id", "")
-                if not invite_id.startswith("inv_"):
-                    self.log(f"❌ Invalid invite_id format: {invite_id}", "ERROR")
-                    return False
-                
-                # Check email sent status
-                email_sent = data.get("email_sent", False)
-                if not email_sent and "email_note" in data:
-                    # Free tier limitation - expected behavior
-                    self.log("✅ Invite recorded with free tier limitation (email_sent=false)")
-                    self.log(f"   Email note: {data.get('email_note', '')}")
-                elif email_sent:
-                    self.log("✅ Invite sent successfully (email_sent=true)")
+                    self.auth_token = data["token"]
+                    self.headers["Authorization"] = f"Bearer {self.auth_token}"
+                    self.log(f"✅ User registered successfully with token: {self.auth_token[:20]}...")
+                    return True
                 else:
-                    self.log(f"⚠️ Unexpected response: email_sent={email_sent}, no email_note", "WARN")
-                
-                self.log(f"   Full response: {json.dumps(data, indent=2)}")
-                
-                # Test validation errors
-                await self.test_invite_validation_errors(recipient_id)
-                
-                # Test access control
-                await self.test_invite_access_control()
-                
-                return True
-            else:
-                self.log(f"❌ Invite failed: {response.status_code} - {response.text}", "ERROR")
-                return False
-                
+                    self.log(f"❌ User registration failed: {response.status_code} - {response.text}")
+                    return False
         except Exception as e:
-            self.log(f"❌ Invite test error: {str(e)}", "ERROR")
+            self.log(f"❌ User registration error: {str(e)}")
             return False
 
-    async def test_invite_validation_errors(self, recipient_id):
-        """Test invite validation error scenarios."""
-        self.log("\n   Testing validation errors...")
-        
-        # Test invalid email format
-        invalid_email_data = {
-            "email": "invalid-email",
-            "caregiver_name": "Test",
-            "message": "Test message"
-        }
-        
+    async def create_care_recipient(self) -> bool:
+        """Create a test care recipient"""
         try:
-            response = await self.client.post(
-                f"{BASE_URL}/care-recipients/{recipient_id}/invite-caregiver",
-                json=invalid_email_data,
-                headers={"Authorization": f"Bearer {self.auth_token}"}
-            )
-            
-            if response.status_code == 422:
-                self.log("   ✅ Invalid email format correctly rejected")
-            else:
-                self.log(f"   ⚠️ Invalid email not rejected: {response.status_code}", "WARN")
-        except Exception as e:
-            self.log(f"   ❌ Invalid email test error: {str(e)}", "ERROR")
+            recipient_data = {
+                "name": "Eleanor Williams",
+                "date_of_birth": "1935-06-15",
+                "gender": "female",
+                "address": "123 Maple Street, Toronto, ON",
+                "phone": "416-555-0123",
+                "medical_conditions": ["Diabetes Type 2", "Hypertension"],
+                "allergies": ["Penicillin", "Shellfish"],
+                "blood_type": "O+",
+                "weight": "68 kg",
+                "blood_pressure": "140/85",
+                "blood_pressure_date": "2024-01-15",
+                "health_card_number": "1234-567-890",
+                "insurance_info": "Blue Cross Extended Health",
+                "interests": ["Gardening", "Reading", "Knitting"],
+                "favorite_foods": ["Tea and biscuits", "Roast chicken"],
+                "notes": "Prefers morning appointments. Uses a walker for mobility."
+            }
 
-        # Test missing email
-        no_email_data = {
-            "caregiver_name": "Test",
-            "message": "Test message"
-        }
-        
-        try:
-            response = await self.client.post(
-                f"{BASE_URL}/care-recipients/{recipient_id}/invite-caregiver",
-                json=no_email_data,
-                headers={"Authorization": f"Bearer {self.auth_token}"}
-            )
-            
-            if response.status_code == 422:
-                self.log("   ✅ Missing email correctly rejected")
-            else:
-                self.log(f"   ⚠️ Missing email not rejected: {response.status_code}", "WARN")
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{self.base_url}/care-recipients",
+                    json=recipient_data,
+                    headers=self.headers
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    self.care_recipient_id = data["recipient_id"]
+                    self.log(f"✅ Care recipient created: {self.care_recipient_id}")
+                    self.log(f"   Name: {data['name']}")
+                    return True
+                else:
+                    self.log(f"❌ Care recipient creation failed: {response.status_code} - {response.text}")
+                    return False
         except Exception as e:
-            self.log(f"   ❌ Missing email test error: {str(e)}", "ERROR")
+            self.log(f"❌ Care recipient creation error: {str(e)}")
+            return False
 
-    async def test_invite_access_control(self):
-        """Test invite access control."""
-        self.log("\n   Testing access control...")
-        
-        invite_data = {
-            "email": "test@example.com",
-            "caregiver_name": "Test",
-            "message": "Test"
-        }
-        
-        # Test with non-existent recipient
-        fake_recipient_id = "cr_nonexistent123"
-        
+    async def test_patch_dnr_info(self) -> bool:
+        """Test PATCH endpoint with DNR info only"""
         try:
-            response = await self.client.post(
-                f"{BASE_URL}/care-recipients/{fake_recipient_id}/invite-caregiver",
-                json=invite_data,
-                headers={"Authorization": f"Bearer {self.auth_token}"}
-            )
-            
-            if response.status_code == 404:
-                self.log("   ✅ Access control working - non-existent recipient rejected")
-            else:
-                self.log(f"   ❌ Access control issue: {response.status_code}", "ERROR")
-        except Exception as e:
-            self.log(f"   ❌ Access control test error: {str(e)}", "ERROR")
+            dnr_data = {
+                "dnr_info": {
+                    "has_dnr": True,
+                    "dnr_document_photo": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAACAAIDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=",
+                    "dnr_date": "2024-01-10",
+                    "doctor_signature": "Dr. Sarah Johnson",
+                    "witness_signature": "Mary Williams",
+                    "notes": "DNR wishes discussed with family and documented per patient's request."
+                }
+            }
 
-        # Test without authentication
-        try:
-            response = await self.client.post(
-                f"{BASE_URL}/care-recipients/fake_id/invite-caregiver",
-                json=invite_data
-            )
-            
-            if response.status_code == 401:
-                self.log("   ✅ Authentication required - unauthenticated request rejected")
-            else:
-                self.log(f"   ❌ Authentication not required: {response.status_code}", "ERROR")
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.patch(
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}",
+                    json=dnr_data,
+                    headers=self.headers
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "dnr_info" in data and data["dnr_info"]["has_dnr"] == True:
+                        self.log("✅ DNR info PATCH test PASSED")
+                        self.log(f"   DNR status: {data['dnr_info']['has_dnr']}")
+                        self.log(f"   DNR document photo: {'✓ Present' if data['dnr_info']['dnr_document_photo'] else '✗ Missing'}")
+                        return True
+                    else:
+                        self.log("❌ DNR info PATCH test FAILED - DNR info not properly updated")
+                        return False
+                else:
+                    self.log(f"❌ DNR info PATCH test FAILED: {response.status_code} - {response.text}")
+                    return False
         except Exception as e:
-            self.log(f"   ❌ Auth test error: {str(e)}", "ERROR")
-    
+            self.log(f"❌ DNR info PATCH test error: {str(e)}")
+            return False
+
+    async def test_patch_poa_info(self) -> bool:
+        """Test PATCH endpoint with POA info only"""
+        try:
+            poa_data = {
+                "poa_info": {
+                    "name": "Jane Williams Smith",
+                    "relationship": "Daughter",
+                    "phone": "555-123-4567",
+                    "email": "jane.williams.smith@example.com",
+                    "address": "456 Oak Avenue, Toronto, ON M4K 1B2",
+                    "type": "Power of Attorney for Health Care",
+                    "document_date": "2023-11-20",
+                    "notarized": True,
+                    "notes": "Primary contact for medical decisions. Lives close by and visits weekly."
+                }
+            }
+
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.patch(
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}",
+                    json=poa_data,
+                    headers=self.headers
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "poa_info" in data and data["poa_info"]["name"] == "Jane Williams Smith":
+                        self.log("✅ POA info PATCH test PASSED")
+                        self.log(f"   POA name: {data['poa_info']['name']}")
+                        self.log(f"   Relationship: {data['poa_info']['relationship']}")
+                        self.log(f"   Phone: {data['poa_info']['phone']}")
+                        self.log(f"   Email: {data['poa_info']['email']}")
+                        return True
+                    else:
+                        self.log("❌ POA info PATCH test FAILED - POA info not properly updated")
+                        return False
+                else:
+                    self.log(f"❌ POA info PATCH test FAILED: {response.status_code} - {response.text}")
+                    return False
+        except Exception as e:
+            self.log(f"❌ POA info PATCH test error: {str(e)}")
+            return False
+
+    async def test_persistence(self) -> bool:
+        """Verify persistence by getting the care recipient and checking both dnr_info and poa_info"""
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}",
+                    headers=self.headers
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    # Check DNR info persistence
+                    dnr_ok = (
+                        "dnr_info" in data and 
+                        data["dnr_info"]["has_dnr"] == True and
+                        "dnr_document_photo" in data["dnr_info"]
+                    )
+                    
+                    # Check POA info persistence
+                    poa_ok = (
+                        "poa_info" in data and 
+                        data["poa_info"]["name"] == "Jane Williams Smith" and
+                        data["poa_info"]["relationship"] == "Daughter"
+                    )
+                    
+                    if dnr_ok and poa_ok:
+                        self.log("✅ Persistence test PASSED")
+                        self.log("   Both DNR and POA info are properly persisted")
+                        return True
+                    else:
+                        self.log("❌ Persistence test FAILED")
+                        self.log(f"   DNR info persisted: {'✓' if dnr_ok else '✗'}")
+                        self.log(f"   POA info persisted: {'✓' if poa_ok else '✗'}")
+                        return False
+                else:
+                    self.log(f"❌ Persistence test FAILED: {response.status_code} - {response.text}")
+                    return False
+        except Exception as e:
+            self.log(f"❌ Persistence test error: {str(e)}")
+            return False
+
+    async def test_authentication_required(self) -> bool:
+        """Test that authentication is required (401 without token)"""
+        try:
+            headers_no_auth = {"Content-Type": "application/json"}
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.patch(
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}",
+                    json={"dnr_info": {"has_dnr": False}},
+                    headers=headers_no_auth
+                )
+                
+                if response.status_code == 401:
+                    self.log("✅ Authentication test PASSED - 401 returned without token")
+                    return True
+                else:
+                    self.log(f"❌ Authentication test FAILED - Expected 401, got {response.status_code}")
+                    return False
+        except Exception as e:
+            self.log(f"❌ Authentication test error: {str(e)}")
+            return False
+
+    async def test_access_control(self) -> bool:
+        """Test access control with non-existent recipient (404 if not a caregiver)"""
+        try:
+            fake_recipient_id = f"cr_{uuid.uuid4().hex[:12]}"
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.patch(
+                    f"{self.base_url}/care-recipients/{fake_recipient_id}",
+                    json={"dnr_info": {"has_dnr": False}},
+                    headers=self.headers
+                )
+                
+                if response.status_code == 404:
+                    self.log("✅ Access control test PASSED - 404 returned for non-existent recipient")
+                    return True
+                else:
+                    self.log(f"❌ Access control test FAILED - Expected 404, got {response.status_code}")
+                    return False
+        except Exception as e:
+            self.log(f"❌ Access control test error: {str(e)}")
+            return False
+
+    async def test_only_specified_fields_updated(self) -> bool:
+        """Test that only specified fields are updated (other fields remain unchanged)"""
+        try:
+            # First, get original data
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}",
+                    headers=self.headers
+                )
+                
+                if response.status_code != 200:
+                    self.log(f"❌ Field isolation test FAILED - Could not get original data: {response.status_code}")
+                    return False
+                
+                original_data = response.json()
+                original_name = original_data.get("name")
+                original_phone = original_data.get("phone")
+                
+                # Update only medical_conditions
+                update_data = {
+                    "medical_conditions": ["Updated Condition Test"]
+                }
+                
+                response = await client.patch(
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}",
+                    json=update_data,
+                    headers=self.headers
+                )
+                
+                if response.status_code != 200:
+                    self.log(f"❌ Field isolation test FAILED - PATCH failed: {response.status_code}")
+                    return False
+                
+                updated_data = response.json()
+                
+                # Verify only medical_conditions changed
+                name_unchanged = updated_data.get("name") == original_name
+                phone_unchanged = updated_data.get("phone") == original_phone
+                conditions_updated = updated_data.get("medical_conditions") == ["Updated Condition Test"]
+                
+                if name_unchanged and phone_unchanged and conditions_updated:
+                    self.log("✅ Field isolation test PASSED")
+                    self.log("   Only specified field was updated, other fields remained unchanged")
+                    return True
+                else:
+                    self.log("❌ Field isolation test FAILED")
+                    self.log(f"   Name unchanged: {'✓' if name_unchanged else '✗'}")
+                    self.log(f"   Phone unchanged: {'✓' if phone_unchanged else '✗'}")
+                    self.log(f"   Conditions updated: {'✓' if conditions_updated else '✗'}")
+                    return False
+        except Exception as e:
+            self.log(f"❌ Field isolation test error: {str(e)}")
+            return False
+
     async def run_all_tests(self):
-        """Run all tests for backend endpoints."""
-        self.log("=" * 60)
-        self.log("STARTING BACKEND ENDPOINT TESTS")
-        self.log("=" * 60)
+        """Run all DNR/POA PATCH endpoint tests"""
+        self.log("=" * 80)
+        self.log("STARTING DNR/POA PARTIAL UPDATE ENDPOINT TESTS")
+        self.log("=" * 80)
         
-        try:
-            # Step 1: Authentication
-            auth_success = await self.register_user()
-            if not auth_success:
-                self.log("❌ Authentication failed - cannot proceed with tests", "ERROR")
-                return False
-            
-            # Step 2: Test caregiver invite endpoint (main focus)
-            invite_test_success = await self.test_caregiver_invite()
-            
-            # Step 3: Test AI summarization (existing test)
-            # auth_req_success = await self.test_authentication_required()
-            # main_test_success = await self.test_ai_summarize_appointment()
-            # error_handling_success = await self.test_invalid_data_handling()
-            
-            # Summary
-            self.log("=" * 60)
-            self.log("TEST SUMMARY")
-            self.log("=" * 60)
-            self.log(f"Authentication: {'✅ PASS' if auth_success else '❌ FAIL'}")
-            self.log(f"Caregiver Invite: {'✅ PASS' if invite_test_success else '❌ FAIL'}")
-            # self.log(f"AI Summarization: {'✅ PASS' if main_test_success else '❌ FAIL'}")
-            
-            overall_success = all([auth_success, invite_test_success])
-            self.log(f"Overall Result: {'✅ PASS' if overall_success else '❌ FAIL'}")
-            
-            return overall_success
-            
-        except Exception as e:
-            self.log(f"❌ Test suite error: {str(e)}", "ERROR")
+        test_results = []
+        
+        # 1. Setup - Register user and create care recipient
+        self.log("\n1. SETUP - Registering user and creating care recipient...")
+        if not await self.register_user():
+            self.log("❌ CRITICAL FAILURE: Could not register user")
             return False
-        finally:
-            await self.cleanup()
+            
+        if not await self.create_care_recipient():
+            self.log("❌ CRITICAL FAILURE: Could not create care recipient")
+            return False
+
+        # 2. Test PATCH with DNR info only
+        self.log("\n2. TESTING PATCH with DNR info only...")
+        test_results.append(("DNR Info PATCH", await self.test_patch_dnr_info()))
+
+        # 3. Test PATCH with POA info only
+        self.log("\n3. TESTING PATCH with POA info only...")
+        test_results.append(("POA Info PATCH", await self.test_patch_poa_info()))
+
+        # 4. Verify persistence
+        self.log("\n4. TESTING persistence...")
+        test_results.append(("Persistence", await self.test_persistence()))
+
+        # 5. Test authentication required
+        self.log("\n5. TESTING authentication requirement...")
+        test_results.append(("Authentication Required", await self.test_authentication_required()))
+
+        # 6. Test access control
+        self.log("\n6. TESTING access control...")
+        test_results.append(("Access Control", await self.test_access_control()))
+
+        # 7. Test field isolation
+        self.log("\n7. TESTING field isolation...")
+        test_results.append(("Field Isolation", await self.test_only_specified_fields_updated()))
+
+        # Summary
+        self.log("\n" + "=" * 80)
+        self.log("TEST RESULTS SUMMARY")
+        self.log("=" * 80)
+        
+        passed = 0
+        failed = 0
+        
+        for test_name, result in test_results:
+            status = "✅ PASSED" if result else "❌ FAILED"
+            self.log(f"{test_name:25} | {status}")
+            if result:
+                passed += 1
+            else:
+                failed += 1
+        
+        self.log(f"\nTotal Tests: {len(test_results)}")
+        self.log(f"Passed: {passed}")
+        self.log(f"Failed: {failed}")
+        
+        overall_success = failed == 0
+        status = "✅ ALL TESTS PASSED" if overall_success else f"❌ {failed} TEST(S) FAILED"
+        self.log(f"\nOVERALL RESULT: {status}")
+        self.log("=" * 80)
+        
+        return overall_success
 
 async def main():
-    """Main test execution."""
-    tester = APITester()
+    """Main test execution"""
+    tester = FamilyCareAPITest()
     success = await tester.run_all_tests()
-    sys.exit(0 if success else 1)
+    return success
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    result = asyncio.run(main())
+    exit(0 if result else 1)

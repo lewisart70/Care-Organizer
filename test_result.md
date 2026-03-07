@@ -271,6 +271,21 @@ metadata:
   test_sequence: 2
   run_ui: true
 
+  - task: "DNR/POA partial update endpoint"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added PATCH /api/care-recipients/{id} endpoint for partial updates. Allows updating just dnr_info or poa_info without requiring all fields. Fixed issue where PUT required 'name' field."
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED SUCCESSFULLY - PATCH /api/care-recipients/{id} endpoint working perfectly. Comprehensive testing completed: 1) DNR info partial update (✓ PASSED) - Successfully updates dnr_info with has_dnr=true and base64 photo 2) POA info partial update (✓ PASSED) - Successfully updates poa_info with name, relationship, phone, email 3) Data persistence (✓ PASSED) - Both DNR and POA info properly persist in database 4) Authentication required (✓ PASSED) - Returns 401 without token 5) Access control (✓ PASSED) - Returns 404 for non-existent recipients 6) Field isolation (✓ PASSED) - Only specified fields updated, others remain unchanged. ALL 6 TESTS PASSED. Endpoint is production-ready."
+
   - task: "Caregiver email invite endpoint"
     implemented: true
     working: true
@@ -294,7 +309,7 @@ test_plan:
 
 agent_communication:
   - agent: "main"
-    message: "NEW TASK: Test the Caregiver Email Invite endpoint POST /api/care-recipients/{id}/invite-caregiver. This endpoint uses Resend to send email invites. Note: On Resend free tier, emails can only be sent to the account owner's email. The endpoint now gracefully handles this by returning success with email_sent=false and an email_note explaining the limitation. Test: 1) Register/login user, 2) Create care recipient, 3) Call invite endpoint with test email. Verify it returns 200 with proper response structure including invite_id, user_exists, email_sent, and email_note fields."
+    message: "NEW: Test the DNR/POA PATCH endpoint: PATCH /api/care-recipients/{id}. This endpoint allows partial updates to care recipients, specifically for dnr_info and poa_info fields. Test flow: 1) Login, 2) Get care recipient ID, 3) PATCH with {dnr_info: {has_dnr: true, dnr_document_photo: 'base64...'}} - should return 200, 4) PATCH with {poa_info: {name: 'Test', phone: '555-1234'}} - should return 200, 5) GET the recipient and verify dnr_info and poa_info are persisted."
   - agent: "main"
     message: "Implemented voice-to-text and profile photo features. Please test the backend endpoints first: POST /api/transcribe, POST /api/care-recipients/{id}/profile-photo, DELETE /api/care-recipients/{id}/profile-photo. Authentication is required - register a test user first."
   - agent: "testing"
@@ -309,3 +324,5 @@ agent_communication:
     message: "✅ FRONTEND UI TESTING COMPLETE - Comprehensive mobile UI testing completed successfully! All requested features verified and working: 1) Login screen has beautiful custom terra cotta heart logo, properly styled Google/Apple sign-in buttons, and functional form fields. 2) Add Care Recipient has excellent profile photo picker with circular area, camera icon, and 'Add Photo' text. 3) Notes screen includes proper Tip section with voice recording instructions. 4) Appointments screen has prominent 'Pro Tip' section with recording and AI summary guidance. 5) Home screen displays proper greeting and recipient management. All UI elements are mobile-responsive and professionally designed. No critical issues found. MVP frontend is production-ready!"
   - agent: "testing"
     message: "✅ CAREGIVER EMAIL INVITE TESTING COMPLETE - POST /api/care-recipients/{recipient_id}/invite-caregiver endpoint tested successfully and working correctly. Tested full flow: user registration → care recipient creation → invite caregiver. Endpoint properly handles Resend free tier limitations by returning 200 OK with email_sent=false and informative email_note about domain verification requirements. All validation working: invalid email format (422), missing email (422), authentication required (401), access control (404 for non-existent recipients). Response structure correct with invite_id (inv_ prefix), message, user_exists, email_sent, and email_note fields. No critical issues found."
+  - agent: "testing"
+    message: "✅ DNR/POA PARTIAL UPDATE ENDPOINT TESTING COMPLETE - PATCH /api/care-recipients/{id} endpoint tested comprehensively and working perfectly. ALL 6 TESTS PASSED: 1) DNR info partial update - Successfully updates dnr_info fields (has_dnr, document photo, dates, signatures) 2) POA info partial update - Successfully updates poa_info fields (name, relationship, phone, email, address) 3) Data persistence - Both DNR and POA information properly persist in database after updates 4) Authentication required - Returns 401 Unauthorized without valid token 5) Access control - Returns 404 Not Found for non-existent recipients 6) Field isolation - Only specified fields are updated, other existing data remains unchanged. Endpoint supports partial updates perfectly and is production-ready."
