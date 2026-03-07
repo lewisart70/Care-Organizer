@@ -467,13 +467,15 @@ async def register(data: UserRegister):
         "name": data.name,
         "password_hash": hash_password(data.password),
         "picture": None,
+        "disclaimer_accepted": False,
+        "disclaimer_accepted_at": None,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.users.insert_one(user_doc)
     token = create_token(user_id, data.email)
     return {
         "token": token,
-        "user": {"user_id": user_id, "email": data.email, "name": data.name, "picture": None}
+        "user": {"user_id": user_id, "email": data.email, "name": data.name, "picture": None, "disclaimer_accepted": False}
     }
 
 @api_router.post("/auth/login")
@@ -488,7 +490,13 @@ async def login(data: UserLogin):
     token = create_token(user["user_id"], user["email"])
     return {
         "token": token,
-        "user": {"user_id": user["user_id"], "email": user["email"], "name": user["name"], "picture": user.get("picture")}
+        "user": {
+            "user_id": user["user_id"], 
+            "email": user["email"], 
+            "name": user["name"], 
+            "picture": user.get("picture"),
+            "disclaimer_accepted": user.get("disclaimer_accepted", False)
+        }
     }
 
 @api_router.post("/auth/google")
@@ -510,6 +518,7 @@ async def google_auth(request: Request):
     if existing:
         user_id = existing["user_id"]
         await db.users.update_one({"user_id": user_id}, {"$set": {"name": data["name"], "picture": data.get("picture")}})
+        disclaimer_accepted = existing.get("disclaimer_accepted", False)
     else:
         user_id = f"user_{uuid.uuid4().hex[:12]}"
         await db.users.insert_one({
@@ -517,8 +526,11 @@ async def google_auth(request: Request):
             "email": email,
             "name": data["name"],
             "picture": data.get("picture"),
+            "disclaimer_accepted": False,
+            "disclaimer_accepted_at": None,
             "created_at": datetime.now(timezone.utc).isoformat()
         })
+        disclaimer_accepted = False
     session_token = data.get("session_token", f"sess_{uuid.uuid4().hex}")
     await db.user_sessions.insert_one({
         "user_id": user_id,
@@ -530,12 +542,30 @@ async def google_auth(request: Request):
     return {
         "token": token,
         "session_token": session_token,
-        "user": {"user_id": user_id, "email": email, "name": data["name"], "picture": data.get("picture")}
+        "user": {"user_id": user_id, "email": email, "name": data["name"], "picture": data.get("picture"), "disclaimer_accepted": disclaimer_accepted}
     }
 
 @api_router.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
-    return {"user_id": user["user_id"], "email": user["email"], "name": user["name"], "picture": user.get("picture")}
+    return {
+        "user_id": user["user_id"], 
+        "email": user["email"], 
+        "name": user["name"], 
+        "picture": user.get("picture"),
+        "disclaimer_accepted": user.get("disclaimer_accepted", False)
+    }
+
+@api_router.post("/auth/accept-disclaimer")
+async def accept_disclaimer(user: dict = Depends(get_current_user)):
+    """Mark that the user has accepted the privacy and security disclaimer."""
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {
+            "disclaimer_accepted": True,
+            "disclaimer_accepted_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    return {"success": True, "message": "Disclaimer accepted"}
 
 @api_router.post("/auth/logout")
 async def logout(request: Request):

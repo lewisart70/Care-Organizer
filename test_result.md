@@ -572,3 +572,21 @@ agent_communication:
     message: "Test the Export Report feature endpoints. GET /api/care-recipients/{recipient_id}/export-sections and POST /api/care-recipients/{recipient_id}/export-report with download and email_self delivery methods."
   - agent: "testing"
     message: "✅ EXPORT REPORT FEATURE TESTING COMPLETE - Critical bug found and fixed during testing! FINDINGS: 1) ❌ CRITICAL BUG - Both export endpoints were using incorrect database query {'recipient_id': recipient_id, 'user_id': user['user_id']} instead of {'recipient_id': recipient_id, 'caregivers': user['user_id']} causing 404 'Care recipient not found' errors 2) ✅ FIXED - Updated both endpoints to use correct access control field 3) ✅ GET /api/care-recipients/{id}/export-sections - Returns 8 available sections (medications, appointments, doctors, routines, incidents, notes, bathing, emergency_contacts) with proper structure 4) ✅ POST /api/care-recipients/{id}/export-report (download) - Generates valid PDF files with proper content-type and download headers 5) ✅ POST /api/care-recipients/{id}/export-report (email_self) - Successfully sends emails with PDF attachments via Resend integration 6) ✅ Authentication enforced (401 without token) for all endpoints 7) ✅ Access control working (404 for non-existent recipients). ALL 6 TESTS PASSED after bug fix. Export functionality is now production-ready with ReportLab PDF generation and Resend email delivery working correctly."
+
+backend:
+  - task: "Disclaimer acceptance endpoints"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ DISCLAIMER ACCEPTANCE TESTING COMPLETE - Comprehensive testing of all disclaimer acceptance endpoints completed successfully! ALL 6 TESTS PASSED: 1) POST /api/auth/register - ✅ PASSED: Returns user with disclaimer_accepted=false for new registrations 2) POST /api/auth/login - ✅ PASSED: Includes disclaimer_accepted field in user object 3) GET /api/auth/me (before) - ✅ PASSED: Returns disclaimer_accepted field with current status 4) POST /api/auth/accept-disclaimer - ✅ PASSED: Successfully updates user's disclaimer_accepted to true with proper success response 5) GET /api/auth/me (after) - ✅ PASSED: Confirms disclaimer_accepted is now true after acceptance 6) Login persistence - ✅ PASSED: Disclaimer acceptance status persists correctly after re-login. Authentication properly enforced (401 for unauthorized access). All endpoints working correctly with proper field handling and data persistence. Feature is production-ready!"
+
+  - agent: "user"
+    message: "Test the Disclaimer Acceptance feature endpoints."
+  - agent: "testing"
+    message: "✅ DISCLAIMER ACCEPTANCE TESTING COMPLETE - Comprehensive testing of all 6 disclaimer acceptance endpoints completed successfully with 100% pass rate! TESTED FLOW: 1) Register new user (disclaimertest@test.com) - Returns disclaimer_accepted=false ✅ 2) Login user - Includes disclaimer_accepted field ✅ 3) GET /auth/me before acceptance - Shows disclaimer_accepted=false ✅ 4) POST /auth/accept-disclaimer - Updates to true with success message ✅ 5) GET /auth/me after acceptance - Confirms disclaimer_accepted=true ✅ 6) Re-login persistence test - Disclaimer status persists correctly ✅ SECURITY VERIFIED: All protected endpoints properly enforce authentication (401 without token/invalid token). Backend implementation follows best practices with proper JWT authentication, database persistence, and field validation. All endpoints working correctly at https://care-recipient-app.preview.emergentagent.com/api. Feature is production-ready and fully functional!"
