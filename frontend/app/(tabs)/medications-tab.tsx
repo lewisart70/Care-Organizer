@@ -57,16 +57,19 @@ export default function MedicationsTab() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Medications</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity testID="check-interactions-btn" style={styles.aiChip} onPress={() => router.push('/medication-checker')}>
-            <Ionicons name="sparkles" size={14} color={COLORS.white} />
-            <Text style={styles.aiChipText}>Check Interactions</Text>
-          </TouchableOpacity>
-          <TouchableOpacity testID="add-medication-btn" style={styles.addBtn} onPress={() => setShowAdd(true)}>
-            <Ionicons name="add" size={22} color={COLORS.white} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity testID="add-medication-btn" style={styles.addBtn} onPress={() => setShowAdd(true)}>
+          <Ionicons name="add" size={22} color={COLORS.white} />
+        </TouchableOpacity>
       </View>
+
+      {/* AI Interaction Checker - moved below header */}
+      <TouchableOpacity testID="check-interactions-btn" style={styles.aiCheckerBar} onPress={() => router.push('/medication-checker')}>
+        <View style={styles.aiCheckerLeft}>
+          <Ionicons name="sparkles" size={18} color={COLORS.secondary} />
+          <Text style={styles.aiCheckerText}>AI Medication Interaction Checker</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
+      </TouchableOpacity>
 
       <ScrollView refreshControl={<RefreshControl refreshing={false} onRefresh={loadMeds} tintColor={COLORS.primary} />}>
         {loading ? <ActivityIndicator color={COLORS.primary} style={{ marginTop: SPACING.xl }} /> :
@@ -137,13 +140,10 @@ const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.sm },
   headerTitle: { fontSize: FONT_SIZES.xxl, fontWeight: '800', color: COLORS.textPrimary },
-  headerActions: { flexDirection: 'row', alignItems: 'center' },
-  aiChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.secondary, borderRadius: RADIUS.full, paddingVertical: SPACING.xs, paddingHorizontal: SPACING.sm, marginRight: SPACING.sm },
-  aiChipText: { color: COLORS.white, fontSize: FONT_SIZES.xs, fontWeight: '700', marginLeft: 4 },
   addBtn: { 
-    width: 40, 
-    height: 40, 
-    borderRadius: 20, 
+    width: 44, 
+    height: 44, 
+    borderRadius: 22, 
     backgroundColor: COLORS.primary, 
     justifyContent: 'center', 
     alignItems: 'center',
@@ -152,6 +152,29 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 4,
+  },
+  aiCheckerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    backgroundColor: COLORS.secondary + '15',
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.secondary + '30',
+  },
+  aiCheckerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  aiCheckerText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '600',
+    color: COLORS.secondary,
   },
   emptyState: { alignItems: 'center', paddingVertical: SPACING.xxl },
   emptyTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary, marginTop: SPACING.md },
