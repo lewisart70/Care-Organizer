@@ -141,6 +141,17 @@ export default function NotesTab() {
         </TouchableOpacity>
       </View>
 
+      {/* Pro Tip Section */}
+      <View style={styles.tipContainer}>
+        <View style={styles.tipHeader}>
+          <Ionicons name="bulb" size={18} color={COLORS.warning} />
+          <Text style={styles.tipTitle}>Tip</Text>
+        </View>
+        <Text style={styles.tipText}>
+          Use the Voice button when adding notes to dictate hands-free. Perfect for busy caregivers!
+        </Text>
+      </View>
+
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
         {['all', ...CATEGORIES].map(cat => (
           <TouchableOpacity key={cat} testID={`filter-${cat}`} style={[styles.filterChip, filter === cat && styles.filterActive]}
@@ -277,6 +288,34 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingTop: SPACING.md },
   headerTitle: { fontSize: FONT_SIZES.xxl, fontWeight: '800', color: COLORS.textPrimary },
   addIconBtn: { padding: SPACING.xs },
+  
+  // Tip section styles
+  tipContainer: {
+    marginHorizontal: SPACING.lg,
+    marginVertical: SPACING.sm,
+    padding: SPACING.sm,
+    backgroundColor: COLORS.warning + '15',
+    borderRadius: RADIUS.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: SPACING.sm,
+  },
+  tipTitle: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
+    color: COLORS.warning,
+    marginLeft: 4,
+  },
+  tipText: {
+    flex: 1,
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+  },
+  
   filterScroll: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, maxHeight: 50 },
   filterChip: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs, borderRadius: RADIUS.full, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, marginRight: SPACING.sm },
   filterActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },

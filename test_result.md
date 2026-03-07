@@ -103,11 +103,12 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Family Care Organizer app - Adding voice-to-text for notes and profile photos for care recipients.
+  Family Care Organizer app - Adding voice-to-text for notes, profile photos for care recipients, and AI appointment summarization.
   Features being implemented:
   1. Voice-to-text notes using OpenAI Whisper API (cloud-based)
   2. Profile photo upload for care recipients
   3. Display profile photos on home screen as thumbnails
+  4. AI appointment summarization endpoint for extracting key medical information from doctor visit transcripts
 
 backend:
   - task: "Audio transcription endpoint"
@@ -154,6 +155,24 @@ backend:
       - working: true
         agent: "testing"
         comment: "✅ TESTED SUCCESSFULLY - Endpoint working correctly. Successfully removes profile photos from care recipients. Returns proper success message. Authentication and authorization working as expected."
+
+  - task: "AI appointment summarization endpoint"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added POST /api/ai/summarize-appointment endpoint for AI-powered medical appointment transcript summarization"
+      - working: false
+        agent: "testing"
+        comment: "❌ IMPORT ERROR - Endpoint failed due to incorrect import 'OpenAIChat' from emergentintegrations.llm.openai module. The correct class is 'LlmChat'."
+      - working: true
+        agent: "testing"
+        comment: "✅ FIXED AND TESTED SUCCESSFULLY - Corrected import to use LlmChat from emergentintegrations.llm.chat. Endpoint now working correctly. Accepts appointment transcripts, requires authentication, properly integrates with GPT-4o-mini for medical summarization. Successfully extracts key medical information including diagnosis, medications, instructions, and follow-up details. Returns structured summary with success flag."
 
 frontend:
   - task: "Voice-to-text in Notes"
@@ -209,3 +228,7 @@ agent_communication:
     message: "Implemented voice-to-text and profile photo features. Please test the backend endpoints first: POST /api/transcribe, POST /api/care-recipients/{id}/profile-photo, DELETE /api/care-recipients/{id}/profile-photo. Authentication is required - register a test user first."
   - agent: "testing"
     message: "✅ BACKEND TESTING COMPLETE - All 3 backend endpoints tested successfully and working correctly. Audio transcription properly integrates with OpenAI Whisper API and handles authentication. Profile photo upload/delete endpoints work with proper base64 storage and retrieval. All endpoints require proper authentication. No major issues found. Ready for frontend testing or MVP completion."
+  - agent: "user"
+    message: "Test the new AI appointment summarization endpoint: POST /api/ai/summarize-appointment. Should accept appointment transcripts and return structured medical summaries."
+  - agent: "testing"
+    message: "✅ AI APPOINTMENT SUMMARIZATION TESTING COMPLETE - Fixed import issue and endpoint now working correctly. Successfully tested POST /api/ai/summarize-appointment with authentication. Endpoint properly processes medical transcripts using GPT-4o-mini and extracts key information including diagnosis, medications, instructions, and follow-up details. Returns structured summary with success flag. All backend endpoints (4 total) are now tested and working."

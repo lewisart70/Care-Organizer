@@ -91,6 +91,10 @@ class AudioTranscriptionRequest(BaseModel):
 class ProfilePhotoRequest(BaseModel):
     photo_base64: str
 
+class SummarizeAppointmentRequest(BaseModel):
+    transcript: str
+    appointment_title: Optional[str] = None
+
 class MedicationCreate(BaseModel):
     name: str
     dosage: str
@@ -557,6 +561,50 @@ async def transcribe_audio(data: AudioTranscriptionRequest, user: dict = Depends
     except Exception as e:
         logger.error(f"Transcription error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+
+@api_router.post("/ai/summarize-appointment")
+async def summarize_appointment(data: SummarizeAppointmentRequest, user: dict = Depends(get_current_user)):
+    """Use AI to summarize a doctor appointment transcript and extract key medical information."""
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        
+        system_prompt = """You are a medical assistant helping caregivers understand doctor appointments.
+Analyze the appointment transcript and extract key information in a structured format.
+
+Please provide:
+1. **Summary**: A brief 2-3 sentence overview of the appointment
+2. **Diagnosis/Condition**: Any diagnoses or conditions discussed
+3. **Medications**: Any medications prescribed or adjusted (name, dosage, frequency)
+4. **Instructions**: Key care instructions or recommendations
+5. **Follow-up**: Next appointment or follow-up actions needed
+6. **Important Notes**: Any warnings, red flags, or critical information
+
+Be concise but thorough. If information is not mentioned in the transcript, indicate "Not discussed"."""
+
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"appointment_summary_{uuid.uuid4().hex[:8]}",
+            system_message=system_prompt
+        )
+        chat.with_model("openai", "gpt-4o-mini")
+
+        user_message = UserMessage(text=f"""Please summarize this doctor appointment recording:
+
+Appointment: {data.appointment_title or 'Doctor Visit'}
+
+Transcript:
+{data.transcript}""")
+
+        response = await chat.send_message(user_message)
+        
+        return {
+            "summary": response,
+            "success": True
+        }
+    
+    except Exception as e:
+        logger.error(f"Summarization error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Summarization failed: {str(e)}")
 
 # ======================== MEDICATIONS ROUTES ========================
 
