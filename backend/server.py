@@ -234,6 +234,11 @@ class BathingOut(BaseModel):
     notes: Optional[str] = None
     assisted_by: Optional[str] = None
 
+class RoutineCreate(BaseModel):
+    time_of_day: str  # morning, afternoon, evening, night
+    activity: str
+    notes: Optional[str] = None
+
 class AppointmentCreate(BaseModel):
     title: str
     date: str
@@ -978,6 +983,21 @@ async def delete_note(recipient_id: str, note_id: str, user: dict = Depends(get_
         raise HTTPException(status_code=404, detail="Note not found")
     return {"message": "Note deleted"}
 
+@api_router.put("/care-recipients/{recipient_id}/notes/{note_id}")
+async def update_note(recipient_id: str, note_id: str, data: NoteCreate, user: dict = Depends(get_current_user)):
+    r = await db.care_recipients.find_one({"recipient_id": recipient_id, "caregivers": user["user_id"]})
+    if not r:
+        raise HTTPException(status_code=404, detail="Care recipient not found")
+    existing = await db.notes.find_one({"note_id": note_id, "recipient_id": recipient_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Note not found")
+    await db.notes.update_one(
+        {"note_id": note_id, "recipient_id": recipient_id},
+        {"$set": {"content": data.content, "category": data.category, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    updated = await db.notes.find_one({"note_id": note_id}, {"_id": 0})
+    return updated
+
 # ======================== INCIDENTS ROUTES ========================
 
 @api_router.post("/care-recipients/{recipient_id}/incidents")
@@ -1003,6 +1023,31 @@ async def list_incidents(recipient_id: str, user: dict = Depends(get_current_use
     incidents = await db.incidents.find({"recipient_id": recipient_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
     return incidents
 
+@api_router.delete("/care-recipients/{recipient_id}/incidents/{incident_id}")
+async def delete_incident(recipient_id: str, incident_id: str, user: dict = Depends(get_current_user)):
+    r = await db.care_recipients.find_one({"recipient_id": recipient_id, "caregivers": user["user_id"]})
+    if not r:
+        raise HTTPException(status_code=404, detail="Care recipient not found")
+    result = await db.incidents.delete_one({"incident_id": incident_id, "recipient_id": recipient_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    return {"message": "Incident deleted"}
+
+@api_router.put("/care-recipients/{recipient_id}/incidents/{incident_id}")
+async def update_incident(recipient_id: str, incident_id: str, data: IncidentCreate, user: dict = Depends(get_current_user)):
+    r = await db.care_recipients.find_one({"recipient_id": recipient_id, "caregivers": user["user_id"]})
+    if not r:
+        raise HTTPException(status_code=404, detail="Care recipient not found")
+    existing = await db.incidents.find_one({"incident_id": incident_id, "recipient_id": recipient_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    await db.incidents.update_one(
+        {"incident_id": incident_id, "recipient_id": recipient_id},
+        {"$set": data.dict()}
+    )
+    updated = await db.incidents.find_one({"incident_id": incident_id}, {"_id": 0})
+    return updated
+
 # ======================== BATHING ROUTES ========================
 
 @api_router.post("/care-recipients/{recipient_id}/bathing")
@@ -1023,6 +1068,31 @@ async def list_bathing(recipient_id: str, user: dict = Depends(get_current_user)
         raise HTTPException(status_code=404, detail="Care recipient not found")
     records = await db.bathing.find({"recipient_id": recipient_id}, {"_id": 0}).sort("date", -1).to_list(200)
     return records
+
+@api_router.delete("/care-recipients/{recipient_id}/bathing/{bathing_id}")
+async def delete_bathing(recipient_id: str, bathing_id: str, user: dict = Depends(get_current_user)):
+    r = await db.care_recipients.find_one({"recipient_id": recipient_id, "caregivers": user["user_id"]})
+    if not r:
+        raise HTTPException(status_code=404, detail="Care recipient not found")
+    result = await db.bathing.delete_one({"bathing_id": bathing_id, "recipient_id": recipient_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Bathing record not found")
+    return {"message": "Bathing record deleted"}
+
+@api_router.put("/care-recipients/{recipient_id}/bathing/{bathing_id}")
+async def update_bathing(recipient_id: str, bathing_id: str, data: BathingCreate, user: dict = Depends(get_current_user)):
+    r = await db.care_recipients.find_one({"recipient_id": recipient_id, "caregivers": user["user_id"]})
+    if not r:
+        raise HTTPException(status_code=404, detail="Care recipient not found")
+    existing = await db.bathing.find_one({"bathing_id": bathing_id, "recipient_id": recipient_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Bathing record not found")
+    await db.bathing.update_one(
+        {"bathing_id": bathing_id, "recipient_id": recipient_id},
+        {"$set": data.dict()}
+    )
+    updated = await db.bathing.find_one({"bathing_id": bathing_id}, {"_id": 0})
+    return updated
 
 # ======================== APPOINTMENTS ROUTES ========================
 
@@ -1100,6 +1170,21 @@ async def delete_routine(recipient_id: str, routine_id: str, user: dict = Depend
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Routine not found")
     return {"message": "Routine deleted"}
+
+@api_router.put("/care-recipients/{recipient_id}/routines/{routine_id}")
+async def update_routine(recipient_id: str, routine_id: str, data: RoutineCreate, user: dict = Depends(get_current_user)):
+    r = await db.care_recipients.find_one({"recipient_id": recipient_id, "caregivers": user["user_id"]})
+    if not r:
+        raise HTTPException(status_code=404, detail="Care recipient not found")
+    existing = await db.routines.find_one({"routine_id": routine_id, "recipient_id": recipient_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Routine not found")
+    await db.routines.update_one(
+        {"routine_id": routine_id, "recipient_id": recipient_id},
+        {"$set": data.dict()}
+    )
+    updated = await db.routines.find_one({"routine_id": routine_id}, {"_id": 0})
+    return updated
 
 # ======================== NUTRITION ROUTES ========================
 
