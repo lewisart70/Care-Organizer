@@ -50,11 +50,13 @@ export default function NutritionScreen() {
         ...favoriteMeals,
         [selectedCategory]: [...(favoriteMeals[selectedCategory] || []), newMeal.trim()]
       };
-      await api.put(`/care-recipients/${selectedRecipientId}`, { favorite_meals: updatedMeals });
+      await api.patch(`/care-recipients/${selectedRecipientId}`, { favorite_meals: updatedMeals });
       setFavoriteMeals(updatedMeals);
       setNewMeal('');
       setShowAdd(false);
-    } catch (e: any) { Alert.alert('Error', e.message); }
+    } catch (e: any) { 
+      Alert.alert('Error', typeof e.message === 'string' ? e.message : 'Failed to save meal'); 
+    }
     finally { setSaving(false); }
   };
 
@@ -68,9 +70,11 @@ export default function NutritionScreen() {
               ...favoriteMeals,
               [category]: favoriteMeals[category].filter((_: any, i: number) => i !== mealIndex)
             };
-            await api.put(`/care-recipients/${selectedRecipientId}`, { favorite_meals: updatedMeals });
+            await api.patch(`/care-recipients/${selectedRecipientId}`, { favorite_meals: updatedMeals });
             setFavoriteMeals(updatedMeals);
-          } catch (e: any) { Alert.alert('Error', e.message); }
+          } catch (e: any) { 
+            Alert.alert('Error', typeof e.message === 'string' ? e.message : 'Failed to remove meal'); 
+          }
         }
       }
     ]);
