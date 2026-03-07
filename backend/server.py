@@ -80,6 +80,8 @@ class CareRecipientCreate(BaseModel):
     dnr_info: Optional[dict] = None
     poa_info: Optional[dict] = None
     pharmacy_info: Optional[dict] = None  # name, address, phone, fax
+    legal_financial_password: Optional[str] = None  # Password for legal/financial section
+    legal_financial_password_hint: Optional[str] = None  # Password hint
 
 class CareRecipientOut(BaseModel):
     recipient_id: str
@@ -106,6 +108,8 @@ class CareRecipientOut(BaseModel):
     dnr_info: Optional[dict] = None
     poa_info: Optional[dict] = None
     pharmacy_info: Optional[dict] = None
+    has_legal_password: Optional[bool] = False  # Don't expose actual password, just whether it's set
+    legal_financial_password_hint: Optional[str] = None
 
 class AudioTranscriptionRequest(BaseModel):
     audio_base64: str
@@ -506,7 +510,71 @@ async def get_care_recipient(recipient_id: str, user: dict = Depends(get_current
     )
     if not r:
         raise HTTPException(status_code=404, detail="Care recipient not found")
+    # Add has_legal_password flag without exposing actual password
+    r['has_legal_password'] = bool(r.get('legal_financial_password'))
+    # Remove the actual password from response
+    r.pop('legal_financial_password', None)
     return r
+
+# Legal & Financial Password endpoints
+@api_router.post("/care-recipients/{recipient_id}/legal-financial/verify-password")
+async def verify_legal_password(recipient_id: str, request: Request, user: dict = Depends(get_current_user)):
+    """Verify the password for legal/financial section"""
+    r = await db.care_recipients.find_one({"recipient_id": recipient_id, "caregivers": user["user_id"]})
+    if not r:
+        raise HTTPException(status_code=404, detail="Care recipient not found")
+    
+    body = await request.json()
+    password = body.get('password', '')
+    
+    stored_password = r.get('legal_financial_password')
+    if not stored_password:
+        return {"valid": True, "message": "No password set"}
+    
+    if password == stored_password:
+        return {"valid": True, "message": "Password correct"}
+    else:
+        return {"valid": False, "message": "Incorrect password. Please contact the primary caregiver for access."}
+
+@api_router.post("/care-recipients/{recipient_id}/legal-financial/set-password")
+async def set_legal_password(recipient_id: str, request: Request, user: dict = Depends(get_current_user)):
+    """Set or change the password for legal/financial section - only primary caregiver"""
+    r = await db.care_recipients.find_one({"recipient_id": recipient_id})
+    if not r:
+        raise HTTPException(status_code=404, detail="Care recipient not found")
+    
+    # Check if user is primary caregiver (first in the list)
+    caregivers = r.get('caregivers', [])
+    if not caregivers or caregivers[0] != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Only the primary caregiver can set or change the password")
+    
+    body = await request.json()
+    new_password = body.get('password', '')
+    hint = body.get('hint', '')
+    
+    await db.care_recipients.update_one(
+        {"recipient_id": recipient_id},
+        {"$set": {
+            "legal_financial_password": new_password if new_password else None,
+            "legal_financial_password_hint": hint if hint else None
+        }}
+    )
+    
+    if new_password:
+        return {"message": "Password set successfully"}
+    else:
+        return {"message": "Password removed"}
+
+@api_router.get("/care-recipients/{recipient_id}/legal-financial/is-primary")
+async def check_is_primary_caregiver(recipient_id: str, user: dict = Depends(get_current_user)):
+    """Check if current user is the primary caregiver"""
+    r = await db.care_recipients.find_one({"recipient_id": recipient_id, "caregivers": user["user_id"]})
+    if not r:
+        raise HTTPException(status_code=404, detail="Care recipient not found")
+    
+    caregivers = r.get('caregivers', [])
+    is_primary = caregivers and caregivers[0] == user["user_id"]
+    return {"is_primary": is_primary}
 
 @api_router.put("/care-recipients/{recipient_id}")
 async def update_care_recipient(recipient_id: str, data: CareRecipientCreate, user: dict = Depends(get_current_user)):

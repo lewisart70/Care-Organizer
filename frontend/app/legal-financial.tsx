@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, TextInput, Modal, Alert, RefreshControl, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -30,14 +30,121 @@ export default function LegalFinancialScreen() {
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
+  // Password protection states
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [hasPassword, setHasPassword] = useState(false);
+  const [passwordHint, setPasswordHint] = useState('');
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
+  const [enteredPassword, setEnteredPassword] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [wrongAttempts, setWrongAttempts] = useState(0);
+  
+  // Password settings
+  const [isPrimary, setIsPrimary] = useState(false);
+  const [showPasswordSettings, setShowPasswordSettings] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordHint, setNewPasswordHint] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  // Check if password is required
+  const checkAccess = useCallback(async () => {
+    if (!selectedRecipientId) return;
+    try {
+      const [recipientData, primaryCheck] = await Promise.all([
+        api.get(`/care-recipients/${selectedRecipientId}`),
+        api.get(`/care-recipients/${selectedRecipientId}/legal-financial/is-primary`)
+      ]);
+      
+      setHasPassword(recipientData.has_legal_password || false);
+      setPasswordHint(recipientData.legal_financial_password_hint || '');
+      setIsPrimary(primaryCheck.is_primary);
+      
+      if (recipientData.has_legal_password) {
+        setShowPasswordPrompt(true);
+      } else {
+        setIsUnlocked(true);
+      }
+    } catch (e) {
+      console.error('Error checking access:', e);
+      setIsUnlocked(true); // Allow access if check fails
+    }
+  }, [selectedRecipientId]);
+
+  useEffect(() => {
+    checkAccess();
+  }, [checkAccess]);
+
   const load = useCallback(async () => {
-    if (!selectedRecipientId) { setLoading(false); return; }
+    if (!selectedRecipientId || !isUnlocked) { setLoading(false); return; }
     try { setItems(await api.get(`/care-recipients/${selectedRecipientId}/legal-financial`)); } 
     catch (e) { console.error(e); } 
     finally { setLoading(false); }
-  }, [selectedRecipientId]);
+  }, [selectedRecipientId, isUnlocked]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => { 
+    if (isUnlocked) load(); 
+  }, [load, isUnlocked]));
+
+  const verifyPassword = async () => {
+    if (!enteredPassword.trim()) {
+      Alert.alert('Required', 'Please enter the password');
+      return;
+    }
+    setVerifying(true);
+    try {
+      const result = await api.post(`/care-recipients/${selectedRecipientId}/legal-financial/verify-password`, {
+        password: enteredPassword
+      });
+      
+      if (result.valid) {
+        setIsUnlocked(true);
+        setShowPasswordPrompt(false);
+        setEnteredPassword('');
+        setWrongAttempts(0);
+        load();
+      } else {
+        setWrongAttempts(prev => prev + 1);
+        setEnteredPassword('');
+        Alert.alert(
+          'Incorrect Password',
+          wrongAttempts >= 1 
+            ? 'Password incorrect. Please contact the primary caregiver for access to this section.'
+            : 'Please try again or contact the primary caregiver.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to verify password');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const savePassword = async () => {
+    if (!isPrimary) {
+      Alert.alert('Not Authorized', 'Only the primary caregiver can change the password.');
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      await api.post(`/care-recipients/${selectedRecipientId}/legal-financial/set-password`, {
+        password: newPassword,
+        hint: newPasswordHint
+      });
+      
+      setHasPassword(!!newPassword);
+      setPasswordHint(newPasswordHint);
+      setShowPasswordSettings(false);
+      setNewPassword('');
+      setNewPasswordHint('');
+      
+      Alert.alert('Success', newPassword ? 'Password has been set' : 'Password has been removed');
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to save password');
+    } finally {
+      setSavingPassword(false);
+    }
+  };
 
   const openAddModal = () => {
     setEditingItem(null);
@@ -143,6 +250,74 @@ export default function LegalFinancialScreen() {
   const statusColor = (st: string) => st === 'completed' ? COLORS.success : st === 'in_progress' ? COLORS.warning : COLORS.textSecondary;
   const getTypeInfo = (type: string) => ITEM_TYPES.find(t => t.key === type) || ITEM_TYPES[0];
 
+  // Password prompt screen
+  if (showPasswordPrompt && !isUnlocked) {
+    return (
+      <SafeAreaView style={s.container}>
+        <View style={s.header}>
+          <TouchableOpacity testID="back-legal" onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+          </TouchableOpacity>
+          <Text style={s.title}>Legal & Financial</Text>
+          <View style={{ width: 28 }} />
+        </View>
+
+        <View style={s.passwordContainer}>
+          <View style={s.lockIcon}>
+            <Ionicons name="lock-closed" size={48} color={COLORS.primary} />
+          </View>
+          <Text style={s.passwordTitle}>Password Protected</Text>
+          <Text style={s.passwordSubtitle}>
+            This section contains sensitive information and requires a password to access.
+          </Text>
+          
+          {passwordHint && (
+            <View style={s.hintContainer}>
+              <Ionicons name="bulb" size={16} color={COLORS.warning} />
+              <Text style={s.hintText}>Hint: {passwordHint}</Text>
+            </View>
+          )}
+          
+          <TextInput
+            testID="password-input"
+            style={s.passwordInput}
+            placeholder="Enter password"
+            placeholderTextColor={COLORS.border}
+            value={enteredPassword}
+            onChangeText={setEnteredPassword}
+            secureTextEntry
+            autoCapitalize="none"
+          />
+          
+          <TouchableOpacity 
+            testID="unlock-btn"
+            style={s.unlockBtn}
+            onPress={verifyPassword}
+            disabled={verifying}
+          >
+            {verifying ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <>
+                <Ionicons name="lock-open" size={20} color={COLORS.white} />
+                <Text style={s.unlockBtnText}>Unlock</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          
+          {wrongAttempts > 0 && (
+            <View style={s.warningBox}>
+              <Ionicons name="warning" size={20} color={COLORS.error} />
+              <Text style={s.warningText}>
+                Incorrect password. If you don't know the password, please contact the primary caregiver.
+              </Text>
+            </View>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={s.container}>
       <View style={s.header}>
@@ -150,10 +325,39 @@ export default function LegalFinancialScreen() {
           <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
         </TouchableOpacity>
         <Text style={s.title}>Legal & Financial</Text>
-        <TouchableOpacity testID="add-legal-btn" onPress={openAddModal}>
-          <Ionicons name="add-circle" size={28} color={COLORS.primary} />
-        </TouchableOpacity>
+        <View style={s.headerActions}>
+          {isPrimary && (
+            <TouchableOpacity 
+              testID="password-settings-btn"
+              style={s.headerBtn}
+              onPress={() => setShowPasswordSettings(true)}
+            >
+              <Ionicons name="key" size={22} color={hasPassword ? COLORS.success : COLORS.textSecondary} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity testID="add-legal-btn" onPress={openAddModal}>
+            <Ionicons name="add-circle" size={28} color={COLORS.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Password Status Banner */}
+      {isPrimary && (
+        <TouchableOpacity 
+          style={[s.passwordBanner, { backgroundColor: hasPassword ? COLORS.success + '15' : COLORS.warning + '15' }]}
+          onPress={() => setShowPasswordSettings(true)}
+        >
+          <Ionicons 
+            name={hasPassword ? "shield-checkmark" : "shield-outline"} 
+            size={18} 
+            color={hasPassword ? COLORS.success : COLORS.warning} 
+          />
+          <Text style={[s.passwordBannerText, { color: hasPassword ? COLORS.success : COLORS.warning }]}>
+            {hasPassword ? 'Password protected' : 'No password set - Tap to add protection'}
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={hasPassword ? COLORS.success : COLORS.warning} />
+        </TouchableOpacity>
+      )}
 
       <ScrollView refreshControl={<RefreshControl refreshing={false} onRefresh={load} tintColor={COLORS.primary} />}>
         {loading ? <ActivityIndicator color={COLORS.primary} style={{ marginTop: SPACING.xl }} /> :
@@ -184,16 +388,10 @@ export default function LegalFinancialScreen() {
                         {item.status?.replace('_', ' ')}
                       </Text>
                     </View>
-                    <TouchableOpacity 
-                      style={s.actionBtn}
-                      onPress={() => openEditModal(item)}
-                    >
+                    <TouchableOpacity style={s.actionBtn} onPress={() => openEditModal(item)}>
                       <Ionicons name="pencil" size={16} color={COLORS.primary} />
                     </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={s.actionBtn}
-                      onPress={() => handleDelete(item.item_id, item.title)}
-                    >
+                    <TouchableOpacity style={s.actionBtn} onPress={() => handleDelete(item.item_id, item.title)}>
                       <Ionicons name="trash-outline" size={16} color={COLORS.error} />
                     </TouchableOpacity>
                   </View>
@@ -214,12 +412,8 @@ export default function LegalFinancialScreen() {
                   </View>
                 )}
                 
-                {/* Image thumbnail */}
                 {item.image && (
-                  <TouchableOpacity 
-                    style={s.imageThumbnailContainer}
-                    onPress={() => viewImage(item.image)}
-                  >
+                  <TouchableOpacity style={s.imageThumbnailContainer} onPress={() => viewImage(item.image)}>
                     <Image source={{ uri: item.image }} style={s.imageThumbnail} />
                     <View style={s.imageOverlay}>
                       <Ionicons name="expand" size={16} color={COLORS.white} />
@@ -249,13 +443,11 @@ export default function LegalFinancialScreen() {
             </TouchableOpacity>
           </View>
           <ScrollView style={s.mBody} keyboardShouldPersistTaps="handled">
-            {/* Type selector */}
             <Text style={s.fl}>Type</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SPACING.md }}>
               {ITEM_TYPES.map(t => (
                 <TouchableOpacity 
                   key={t.key} 
-                  testID={`lf-type-${t.key}`} 
                   style={[s.chip, form.item_type === t.key && { backgroundColor: t.color, borderColor: t.color }]} 
                   onPress={() => setForm({ ...form, item_type: t.key })}
                 >
@@ -265,13 +457,11 @@ export default function LegalFinancialScreen() {
               ))}
             </ScrollView>
 
-            {/* Status selector */}
             <Text style={s.fl}>Status</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SPACING.md }}>
               {['pending', 'in_progress', 'completed'].map(st => (
                 <TouchableOpacity 
                   key={st} 
-                  testID={`lf-status-${st}`} 
                   style={[s.chip, form.status === st && { backgroundColor: statusColor(st), borderColor: statusColor(st) }]} 
                   onPress={() => setForm({ ...form, status: st })}
                 >
@@ -282,7 +472,6 @@ export default function LegalFinancialScreen() {
               ))}
             </ScrollView>
 
-            {/* Form fields */}
             {[
               { k: 'title', l: 'Title *', p: 'e.g., Health Insurance Card' },
               { k: 'description', l: 'Description', p: 'Details about this item', ml: true },
@@ -293,7 +482,6 @@ export default function LegalFinancialScreen() {
               <View key={k} style={s.fg}>
                 <Text style={s.fl}>{l}</Text>
                 <TextInput 
-                  testID={`lf-${k}`} 
                   style={ml ? s.ta : s.fi} 
                   placeholder={p} 
                   placeholderTextColor={COLORS.border} 
@@ -305,26 +493,19 @@ export default function LegalFinancialScreen() {
               </View>
             ))}
 
-            {/* Image upload section */}
             <View style={s.imageSection}>
               <Text style={s.fl}>Document Image</Text>
-              <Text style={s.imageHelp}>Take a photo or upload an image of the document (insurance card, will, etc.)</Text>
+              <Text style={s.imageHelp}>Take a photo or upload an image of the document</Text>
               
               {form.image ? (
                 <View style={s.imagePreviewContainer}>
                   <Image source={{ uri: form.image }} style={s.imagePreview} />
                   <View style={s.imagePreviewActions}>
-                    <TouchableOpacity 
-                      style={s.changeImageBtn}
-                      onPress={() => pickImage(true)}
-                    >
+                    <TouchableOpacity style={s.changeImageBtn} onPress={() => pickImage(true)}>
                       <Ionicons name="camera" size={16} color={COLORS.primary} />
                       <Text style={s.changeImageText}>Retake</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={s.removeImageBtn}
-                      onPress={() => setForm({ ...form, image: '' })}
-                    >
+                    <TouchableOpacity style={s.removeImageBtn} onPress={() => setForm({ ...form, image: '' })}>
                       <Ionicons name="trash" size={16} color={COLORS.error} />
                       <Text style={s.removeImageText}>Remove</Text>
                     </TouchableOpacity>
@@ -332,19 +513,11 @@ export default function LegalFinancialScreen() {
                 </View>
               ) : (
                 <View style={s.imageButtons}>
-                  <TouchableOpacity 
-                    testID="take-photo-btn"
-                    style={s.imageBtn}
-                    onPress={() => pickImage(true)}
-                  >
+                  <TouchableOpacity style={s.imageBtn} onPress={() => pickImage(true)}>
                     <Ionicons name="camera" size={24} color={COLORS.primary} />
                     <Text style={s.imageBtnText}>Take Photo</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
-                    testID="choose-photo-btn"
-                    style={s.imageBtn}
-                    onPress={() => pickImage(false)}
-                  >
+                  <TouchableOpacity style={s.imageBtn} onPress={() => pickImage(false)}>
                     <Ionicons name="images" size={24} color={COLORS.primary} />
                     <Text style={s.imageBtnText}>Choose Photo</Text>
                   </TouchableOpacity>
@@ -358,20 +531,77 @@ export default function LegalFinancialScreen() {
       {/* Full Image View Modal */}
       <Modal visible={showImageModal} animationType="fade" transparent>
         <View style={s.imageModalOverlay}>
-          <TouchableOpacity 
-            style={s.imageModalClose}
-            onPress={() => setShowImageModal(false)}
-          >
+          <TouchableOpacity style={s.imageModalClose} onPress={() => setShowImageModal(false)}>
             <Ionicons name="close-circle" size={36} color={COLORS.white} />
           </TouchableOpacity>
-          {selectedImage && (
-            <Image 
-              source={{ uri: selectedImage }} 
-              style={s.fullImage} 
-              resizeMode="contain"
-            />
-          )}
+          {selectedImage && <Image source={{ uri: selectedImage }} style={s.fullImage} resizeMode="contain" />}
         </View>
+      </Modal>
+
+      {/* Password Settings Modal */}
+      <Modal visible={showPasswordSettings} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={s.modal}>
+          <View style={s.mHeader}>
+            <TouchableOpacity onPress={() => { setShowPasswordSettings(false); setNewPassword(''); setNewPasswordHint(''); }}>
+              <Text style={s.cancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={s.mTitle}>Password Settings</Text>
+            <TouchableOpacity onPress={savePassword} disabled={savingPassword}>
+              {savingPassword ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Text style={s.save}>Save</Text>}
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={s.mBody}>
+            <View style={s.settingsInfo}>
+              <Ionicons name="shield-checkmark" size={32} color={COLORS.primary} />
+              <Text style={s.settingsTitle}>Protect Sensitive Information</Text>
+              <Text style={s.settingsText}>
+                Set a password to protect the Legal & Financial section. Other caregivers will need this password to view the contents.
+              </Text>
+            </View>
+
+            {hasPassword && (
+              <View style={s.currentPasswordInfo}>
+                <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+                <Text style={s.currentPasswordText}>A password is currently set</Text>
+              </View>
+            )}
+
+            <View style={s.fg}>
+              <Text style={s.fl}>{hasPassword ? 'New Password' : 'Password'}</Text>
+              <Text style={s.fieldHint}>Leave empty to remove password protection</Text>
+              <TextInput
+                testID="new-password-input"
+                style={s.fi}
+                placeholder={hasPassword ? "Enter new password (or leave empty to remove)" : "Create a password"}
+                placeholderTextColor={COLORS.border}
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={s.fg}>
+              <Text style={s.fl}>Password Hint (Optional)</Text>
+              <Text style={s.fieldHint}>Help other caregivers remember the password</Text>
+              <TextInput
+                testID="password-hint-input"
+                style={s.fi}
+                placeholder="e.g., Family pet's name"
+                placeholderTextColor={COLORS.border}
+                value={newPasswordHint}
+                onChangeText={setNewPasswordHint}
+              />
+            </View>
+
+            <View style={s.disclaimerBox}>
+              <Ionicons name="information-circle" size={20} color={COLORS.info} />
+              <Text style={s.disclaimerText}>
+                Only you (the primary caregiver) can set, change, or remove the password. Other caregivers will see a message to contact you if they enter the wrong password.
+              </Text>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -380,7 +610,36 @@ export default function LegalFinancialScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  headerBtn: { padding: 4 },
   title: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.textPrimary },
+  
+  // Password banner
+  passwordBanner: { flexDirection: 'row', alignItems: 'center', marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, paddingVertical: SPACING.sm, paddingHorizontal: SPACING.md, borderRadius: RADIUS.lg, gap: SPACING.sm },
+  passwordBannerText: { flex: 1, fontSize: FONT_SIZES.sm, fontWeight: '600' },
+  
+  // Password prompt screen
+  passwordContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: SPACING.xl },
+  lockIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: COLORS.primary + '15', justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.lg },
+  passwordTitle: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.textPrimary, marginBottom: SPACING.sm },
+  passwordSubtitle: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, textAlign: 'center', marginBottom: SPACING.lg },
+  hintContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.warning + '15', paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: RADIUS.lg, marginBottom: SPACING.lg, gap: SPACING.sm },
+  hintText: { fontSize: FONT_SIZES.sm, color: COLORS.warning, fontWeight: '600' },
+  passwordInput: { width: '100%', backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, paddingHorizontal: SPACING.md, height: 52, fontSize: FONT_SIZES.md, color: COLORS.textPrimary, marginBottom: SPACING.md },
+  unlockBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.primary, paddingVertical: SPACING.md, paddingHorizontal: SPACING.xl, borderRadius: RADIUS.lg, gap: SPACING.sm },
+  unlockBtnText: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.white },
+  warningBox: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: COLORS.error + '10', padding: SPACING.md, borderRadius: RADIUS.lg, marginTop: SPACING.lg, gap: SPACING.sm },
+  warningText: { flex: 1, fontSize: FONT_SIZES.sm, color: COLORS.error },
+  
+  // Password settings
+  settingsInfo: { alignItems: 'center', paddingVertical: SPACING.lg, marginBottom: SPACING.lg },
+  settingsTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary, marginTop: SPACING.sm },
+  settingsText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, textAlign: 'center', marginTop: SPACING.xs },
+  currentPasswordInfo: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.success + '15', padding: SPACING.md, borderRadius: RADIUS.lg, marginBottom: SPACING.lg, gap: SPACING.sm },
+  currentPasswordText: { fontSize: FONT_SIZES.sm, color: COLORS.success, fontWeight: '600' },
+  fieldHint: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginBottom: SPACING.xs },
+  disclaimerBox: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: COLORS.info + '10', padding: SPACING.md, borderRadius: RADIUS.lg, marginTop: SPACING.lg, gap: SPACING.sm },
+  disclaimerText: { flex: 1, fontSize: FONT_SIZES.sm, color: COLORS.info },
   
   empty: { alignItems: 'center', paddingVertical: SPACING.xxl },
   emptyTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary, marginTop: SPACING.md },
@@ -424,7 +683,6 @@ const s = StyleSheet.create({
   chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: RADIUS.full, backgroundColor: COLORS.surface, borderWidth: 1.5, borderColor: COLORS.border, marginRight: SPACING.sm, gap: 4 },
   chipText: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textSecondary },
   
-  // Image section styles
   imageSection: { marginTop: SPACING.md, padding: SPACING.md, backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border },
   imageHelp: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginBottom: SPACING.md },
   imageButtons: { flexDirection: 'row', gap: SPACING.md },
@@ -439,7 +697,6 @@ const s = StyleSheet.create({
   removeImageBtn: { flexDirection: 'row', alignItems: 'center', padding: SPACING.sm, borderRadius: RADIUS.md, backgroundColor: COLORS.error + '15', gap: 4 },
   removeImageText: { fontSize: FONT_SIZES.sm, color: COLORS.error, fontWeight: '600' },
   
-  // Full image modal
   imageModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
   imageModalClose: { position: 'absolute', top: 50, right: 20, zIndex: 1 },
   fullImage: { width: '95%', height: '80%' },
