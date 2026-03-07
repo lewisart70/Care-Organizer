@@ -58,7 +58,8 @@
           "cameraPermission": "Take photos of care recipients for identification",
           "photosPermission": "Choose profile photos from your library"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true

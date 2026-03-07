@@ -15,6 +15,7 @@ export default function NotesTab() {
   const [notes, setNotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [editingNote, setEditingNote] = useState<any>(null);
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('general');
   const [saving, setSaving] = useState(false);
@@ -35,6 +36,20 @@ export default function NotesTab() {
   }, [selectedRecipientId]);
 
   useFocusEffect(useCallback(() => { loadNotes(); }, [loadNotes]));
+
+  const openAddModal = () => {
+    setEditingNote(null);
+    setContent('');
+    setCategory('general');
+    setShowAdd(true);
+  };
+
+  const openEditModal = (note: any) => {
+    setEditingNote(note);
+    setContent(note.content || '');
+    setCategory(note.category || 'general');
+    setShowAdd(true);
+  };
 
   const startRecording = async () => {
     try {
@@ -107,20 +122,45 @@ export default function NotesTab() {
     }
   };
 
-  const handleAdd = async () => {
+  const handleSave = async () => {
     if (!content.trim()) { Alert.alert('Required', 'Please enter a note'); return; }
     setSaving(true);
     try {
-      await api.post(`/care-recipients/${selectedRecipientId}/notes`, { content, category });
-      setShowAdd(false); setContent(''); setCategory('general');
+      if (editingNote) {
+        await api.put(`/care-recipients/${selectedRecipientId}/notes/${editingNote.note_id}`, { content, category });
+        Alert.alert('Updated', 'Note updated successfully');
+      } else {
+        await api.post(`/care-recipients/${selectedRecipientId}/notes`, { content, category });
+      }
+      setShowAdd(false); 
+      setEditingNote(null);
+      setContent(''); 
+      setCategory('general');
       await loadNotes();
     } catch (e: any) { Alert.alert('Error', e.message); }
     finally { setSaving(false); }
   };
 
-  const handleDelete = async (noteId: string) => {
-    try { await api.del(`/care-recipients/${selectedRecipientId}/notes/${noteId}`); await loadNotes(); }
-    catch (e: any) { Alert.alert('Error', e.message); }
+  const handleDelete = (noteId: string) => {
+    Alert.alert(
+      'Delete Note',
+      'Are you sure you want to delete this note?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try { 
+              await api.del(`/care-recipients/${selectedRecipientId}/notes/${noteId}`); 
+              await loadNotes(); 
+            } catch (e: any) { 
+              Alert.alert('Error', e.message); 
+            }
+          }
+        }
+      ]
+    );
   };
 
   const filtered = filter === 'all' ? notes : notes.filter(n => n.category === filter);
@@ -136,7 +176,7 @@ export default function NotesTab() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Caregiver Notes</Text>
-        <TouchableOpacity testID="add-note-btn" style={styles.addIconBtn} onPress={() => setShowAdd(true)}>
+        <TouchableOpacity testID="add-note-btn" style={styles.addIconBtn} onPress={openAddModal}>
           <Ionicons name="add-circle" size={28} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
@@ -172,32 +212,53 @@ export default function NotesTab() {
               <Text style={styles.emptyText}>Add notes to track daily observations</Text>
             </View>
           ) : filtered.map(note => (
-            <View key={note.note_id} style={styles.noteCard}>
+            <TouchableOpacity 
+              key={note.note_id} 
+              style={styles.noteCard}
+              onPress={() => openEditModal(note)}
+              activeOpacity={0.7}
+            >
               <View style={styles.noteHeader}>
                 <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(note.category) + '15' }]}>
                   <Text style={[styles.categoryText, { color: getCategoryColor(note.category) }]}>{note.category}</Text>
                 </View>
-                <TouchableOpacity testID={`delete-note-${note.note_id}`} onPress={() => handleDelete(note.note_id)}>
-                  <Ionicons name="trash-outline" size={18} color={COLORS.error} />
-                </TouchableOpacity>
+                <View style={styles.noteActions}>
+                  <TouchableOpacity 
+                    testID={`edit-note-${note.note_id}`} 
+                    style={styles.actionBtn}
+                    onPress={() => openEditModal(note)}
+                  >
+                    <Ionicons name="pencil" size={16} color={COLORS.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    testID={`delete-note-${note.note_id}`} 
+                    style={styles.actionBtn}
+                    onPress={() => handleDelete(note.note_id)}
+                  >
+                    <Ionicons name="trash-outline" size={16} color={COLORS.error} />
+                  </TouchableOpacity>
+                </View>
               </View>
               <Text style={styles.noteContent}>{note.content}</Text>
               <View style={styles.noteMeta}>
                 <Text style={styles.noteAuthor}>{note.author_name}</Text>
                 <Text style={styles.noteDate}>{note.created_at ? new Date(note.created_at).toLocaleDateString() : ''}</Text>
               </View>
-            </View>
+              <View style={styles.editHint}>
+                <Text style={styles.editHintText}>Tap to edit</Text>
+              </View>
+            </TouchableOpacity>
           ))}
       </ScrollView>
 
       <Modal visible={showAdd} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => { setShowAdd(false); setContent(''); }}>
+            <TouchableOpacity onPress={() => { setShowAdd(false); setEditingNote(null); setContent(''); }}>
               <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Add Note</Text>
-            <TouchableOpacity testID="save-note-btn" onPress={handleAdd} disabled={saving}>
+            <Text style={styles.modalTitle}>{editingNote ? 'Edit Note' : 'Add Note'}</Text>
+            <TouchableOpacity testID="save-note-btn" onPress={handleSave} disabled={saving}>
               {saving ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Text style={styles.saveText}>Save</Text>}
             </TouchableOpacity>
           </View>
@@ -324,14 +385,29 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingVertical: SPACING.xxl },
   emptyTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary, marginTop: SPACING.md },
   emptyText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: SPACING.xs },
-  noteCard: { marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, padding: SPACING.md, backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, shadowColor: COLORS.cardShadow, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 1, shadowRadius: 4, elevation: 2 },
+  noteCard: { 
+    marginHorizontal: SPACING.lg, 
+    marginBottom: SPACING.sm, 
+    padding: SPACING.md, 
+    backgroundColor: COLORS.surface, 
+    borderRadius: RADIUS.lg, 
+    shadowColor: COLORS.cardShadow, 
+    shadowOffset: { width: 0, height: 1 }, 
+    shadowOpacity: 1, 
+    shadowRadius: 4, 
+    elevation: 2 
+  },
   noteHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm },
   categoryBadge: { paddingHorizontal: SPACING.sm, paddingVertical: 2, borderRadius: RADIUS.full },
   categoryText: { fontSize: FONT_SIZES.xs, fontWeight: '700' },
+  noteActions: { flexDirection: 'row', gap: SPACING.sm },
+  actionBtn: { padding: SPACING.xs, borderRadius: RADIUS.md },
   noteContent: { fontSize: FONT_SIZES.sm, color: COLORS.textPrimary, lineHeight: 20 },
   noteMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: SPACING.sm },
   noteAuthor: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, fontStyle: 'italic' },
   noteDate: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary },
+  editHint: { alignItems: 'flex-end', marginTop: SPACING.xs },
+  editHintText: { fontSize: FONT_SIZES.xs, color: COLORS.border, fontStyle: 'italic' },
   modalContainer: { flex: 1, backgroundColor: COLORS.background },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   modalTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary },

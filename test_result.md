@@ -316,8 +316,39 @@ metadata:
         agent: "testing"
         comment: "✅ APPOINTMENTS API TESTING COMPLETE - Comprehensive testing of all new features completed successfully. ALL 8 TESTS PASSED: 1) Create appointment with new fields (category, blood_pressure, weight) - ✅ PASSED 2) All category types (doctor/psw/grooming/footcare/respite/therapy/other) - ✅ PASSED 3) PUT update appointment with all fields - ✅ PASSED 4) GET list appointments with new fields visible - ✅ PASSED 5) DELETE appointment with success message - ✅ PASSED 6) Authentication required (401 without token) - ✅ PASSED 7) Access control (404 for non-existent recipients) - ✅ PASSED 8) Backwards compatibility (existing functionality still works) - ✅ PASSED. New vitals fields (blood_pressure, weight) persist correctly. All appointment categories work as expected. API is production-ready."
 
+  - task: "Notes edit functionality"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented PUT /api/care-recipients/{id}/notes/{note_id} endpoint for updating note content and category. Includes proper authentication and validation."
+      - working: true
+        agent: "testing"
+        comment: "✅ NOTES EDIT TESTING COMPLETE - Comprehensive testing of note update functionality completed successfully. ALL TESTS PASSED: 1) PUT /api/care-recipients/{id}/notes/{note_id} endpoint works correctly ✅ 2) Note content and category updates persist in database ✅ 3) Authentication required (401 without token) ✅ 4) Non-existent note handling (404 for invalid note_id) ✅ 5) Updated_at timestamp added on updates ✅. Note editing is fully functional and production-ready."
+
+  - task: "Incidents edit functionality"  
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented PUT /api/care-recipients/{id}/incidents/{incident_id} endpoint for updating incident details including type, severity, description, location, injuries, and action taken. Includes proper authentication and validation."
+      - working: true
+        agent: "testing"
+        comment: "✅ INCIDENTS EDIT TESTING COMPLETE - Comprehensive testing of incident update functionality completed successfully. ALL TESTS PASSED: 1) PUT /api/care-recipients/{id}/incidents/{incident_id} endpoint works correctly ✅ 2) All incident fields (type, severity, description, location, injuries, action_taken) update and persist properly ✅ 3) Authentication required (401 without token) ✅ 4) Non-existent incident handling (404 for invalid incident_id) ✅ 5) Complete data persistence verification ✅. Incident editing is fully functional and production-ready."
+
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Privacy & Security page link in More menu"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -340,6 +371,12 @@ agent_communication:
   - agent: "testing"
     message: "✅ CAREGIVER EMAIL INVITE TESTING COMPLETE - POST /api/care-recipients/{recipient_id}/invite-caregiver endpoint tested successfully and working correctly. Tested full flow: user registration → care recipient creation → invite caregiver. Endpoint properly handles Resend free tier limitations by returning 200 OK with email_sent=false and informative email_note about domain verification requirements. All validation working: invalid email format (422), missing email (422), authentication required (401), access control (404 for non-existent recipients). Response structure correct with invite_id (inv_ prefix), message, user_exists, email_sent, and email_note fields. No critical issues found."
   - agent: "testing"
+
+  - agent: "main"
+    message: "EDIT FUNCTIONALITY IMPLEMENTATION COMPLETE. Testing needed for: 1) PUT /api/care-recipients/{id}/notes/{note_id} - Update note content and category. 2) PUT /api/care-recipients/{id}/incidents/{incident_id} - Update incident details. Frontend screens updated: incidents.tsx (added edit modal with pencil icon, tap-to-edit cards), notes-tab.tsx (added edit modal, pencil icon, tap-to-edit). Also added Privacy & Security link to More menu."
+
     message: "✅ DNR/POA PARTIAL UPDATE ENDPOINT TESTING COMPLETE - PATCH /api/care-recipients/{id} endpoint tested comprehensively and working perfectly. ALL 6 TESTS PASSED: 1) DNR info partial update - Successfully updates dnr_info fields (has_dnr, document photo, dates, signatures) 2) POA info partial update - Successfully updates poa_info fields (name, relationship, phone, email, address) 3) Data persistence - Both DNR and POA information properly persist in database after updates 4) Authentication required - Returns 401 Unauthorized without valid token 5) Access control - Returns 404 Not Found for non-existent recipients 6) Field isolation - Only specified fields are updated, other existing data remains unchanged. Endpoint supports partial updates perfectly and is production-ready."
   - agent: "testing"
     message: "✅ APPOINTMENTS API WITH EDIT, CATEGORIES & VITALS TESTING COMPLETE - Comprehensive testing of all new appointments features completed successfully! ALL 8 TESTS PASSED: 1) POST /api/care-recipients/{id}/appointments with new fields (category, blood_pressure, weight) ✅ 2) All 6 category types work (doctor/psw/grooming/footcare/respite/therapy/other) ✅ 3) PUT /api/care-recipients/{id}/appointments/{id} update endpoint ✅ 4) GET /api/care-recipients/{id}/appointments list with new fields visible ✅ 5) DELETE /api/care-recipients/{id}/appointments/{id} with success confirmation ✅ 6) Authentication required (401 without token) ✅ 7) Access control (404 for non-existent recipients) ✅ 8) Backwards compatibility (existing functionality still works without new fields) ✅. New vitals fields (blood_pressure: '130/85', weight: '72.5 kg') persist correctly in database. All appointment categories tested and working. API is production-ready and fully functional."
+  - agent: "testing"
+    message: "✅ NOTES AND INCIDENTS EDIT TESTING COMPLETE - Comprehensive testing of both Notes and Incidents edit functionality completed successfully! ALL 8 TESTS PASSED: 1) PUT /api/care-recipients/{id}/notes/{note_id} endpoint ✅ 2) Note content and category updates persist correctly ✅ 3) PUT /api/care-recipients/{id}/incidents/{incident_id} endpoint ✅ 4) All incident fields (type, severity, description, location, injuries, action_taken) update and persist properly ✅ 5) Authentication required (401 without token for both endpoints) ✅ 6) Non-existent resource handling (404 for invalid IDs) ✅ 7) Database persistence verification for both notes and incidents ✅ 8) Full CRUD flow validation ✅. Both edit endpoints are fully functional and production-ready. Edit functionality works perfectly for caregiver workflow."

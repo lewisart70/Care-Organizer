@@ -1,6 +1,7 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
@@ -18,9 +19,13 @@ import base64
 import io
 from emergentintegrations.llm.openai import OpenAISpeechToText
 import resend
+from passlib.context import CryptContext
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# Password hashing context for sensitive data
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -38,6 +43,21 @@ resend.api_key = RESEND_API_KEY
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
+
+# Security Headers Middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        # Add security headers
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+        response.headers["Pragma"] = "no-cache"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -531,7 +551,8 @@ async def verify_legal_password(recipient_id: str, request: Request, user: dict 
     if not stored_password:
         return {"valid": True, "message": "No password set"}
     
-    if password == stored_password:
+    # Verify using bcrypt hash
+    if pwd_context.verify(password, stored_password):
         return {"valid": True, "message": "Password correct"}
     else:
         return {"valid": False, "message": "Incorrect password. Please contact the primary caregiver for access."}
@@ -552,10 +573,13 @@ async def set_legal_password(recipient_id: str, request: Request, user: dict = D
     new_password = body.get('password', '')
     hint = body.get('hint', '')
     
+    # Hash the password using bcrypt
+    hashed_password = pwd_context.hash(new_password) if new_password else None
+    
     await db.care_recipients.update_one(
         {"recipient_id": recipient_id},
         {"$set": {
-            "legal_financial_password": new_password if new_password else None,
+            "legal_financial_password": hashed_password,
             "legal_financial_password_hint": hint if hint else None
         }}
     )

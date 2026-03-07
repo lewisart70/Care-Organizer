@@ -18,6 +18,7 @@ const menuItems = [
   { icon: 'restaurant', label: 'Nutrition & Meals', route: '/nutrition', color: '#E67E22' },
   { icon: 'document-lock', label: 'Legal & Financial', route: '/legal-financial', color: '#2C3E50' },
   { icon: 'people', label: 'Caregivers', route: '/caregivers', color: COLORS.info },
+  { icon: 'shield-checkmark', label: 'Privacy & Security', route: '/privacy-security', color: '#1ABC9C' },
   { icon: 'book', label: 'About the Book', route: '/about-book', color: '#D97757' },
 ];
 

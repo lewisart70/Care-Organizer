@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Backend Testing Script for FamilyCare Organizer App
-Tests the new Appointments API with Edit, Categories, and Vitals features
+Tests Notes and Incidents Edit Functionality
 """
 
 import asyncio
@@ -11,19 +11,20 @@ import uuid
 from typing import Dict, Optional
 
 # Backend URL from frontend/.env
-BACKEND_URL = "https://family-health-hub-22.preview.emergentagent.com/api"
+BACKEND_URL = "https://care-recipient-app.preview.emergentagent.com/api"
 
-class AppointmentsAPITest:
+class NotesIncidentsEditTest:
     def __init__(self):
         self.base_url = BACKEND_URL
         self.auth_token = None
         self.test_user = {
-            "email": f"test_appointments_{uuid.uuid4().hex[:8]}@example.com",
+            "email": f"test_notes_incidents_{uuid.uuid4().hex[:8]}@example.com",
             "password": "TestPassword123!",
-            "name": "Appointments Test User"
+            "name": "Notes Incidents Test User"
         }
         self.care_recipient_id = None
-        self.appointment_id = None
+        self.note_id = None
+        self.incident_id = None
         self.headers = {"Content-Type": "application/json"}
 
     def log(self, message: str):
@@ -56,18 +57,18 @@ class AppointmentsAPITest:
         """Create a test care recipient"""
         try:
             recipient_data = {
-                "name": "Margaret Thompson",
-                "date_of_birth": "1938-03-22",
+                "name": "Eleanor Rodriguez",
+                "date_of_birth": "1942-08-15",
                 "gender": "female",
-                "address": "789 Oak Street, Vancouver, BC",
-                "phone": "604-555-0987",
-                "medical_conditions": ["Arthritis", "High Blood Pressure", "Diabetes"],
-                "allergies": ["Sulfa drugs", "Peanuts"],
-                "blood_type": "A+",
-                "weight": "72 kg",
-                "blood_pressure": "135/80",
-                "health_card_number": "9876-543-210",
-                "notes": "Regular appointments needed for blood pressure monitoring and diabetes management."
+                "address": "456 Pine Avenue, Toronto, ON",
+                "phone": "416-555-0123",
+                "medical_conditions": ["Diabetes Type 2", "Osteoporosis", "Mild Dementia"],
+                "allergies": ["Penicillin", "Shellfish"],
+                "blood_type": "O+",
+                "weight": "68 kg",
+                "blood_pressure": "140/90",
+                "health_card_number": "1234-567-890",
+                "notes": "Family caregiver testing notes and incident management features."
             }
 
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -90,134 +91,53 @@ class AppointmentsAPITest:
             self.log(f"❌ Care recipient creation error: {str(e)}")
             return False
 
-    async def test_create_appointment_with_new_fields(self) -> bool:
-        """Test POST /api/care-recipients/{recipient_id}/appointments - Create appointment with new fields"""
+    async def create_note(self) -> bool:
+        """Create a test note to edit later"""
         try:
-            appointment_data = {
-                "title": "Annual Physical Checkup",
-                "date": "2025-06-15",
-                "time": "10:00 AM",
-                "doctor_name": "Dr. Sarah Johnson",
-                "location": "Vancouver General Hospital - Medical Center",
-                "category": "doctor",
-                "blood_pressure": "130/85",
-                "weight": "72.5 kg",
-                "notes": "Routine annual physical - check blood pressure, diabetes management, and arthritis status"
+            note_data = {
+                "content": "Initial note about Eleanor's medication schedule. She takes metformin with breakfast and insulin before dinner.",
+                "category": "medication",
+                "photo": None
             }
 
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/appointments",
-                    json=appointment_data,
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/notes",
+                    json=note_data,
                     headers=self.headers
                 )
                 
                 if response.status_code == 200:
                     data = response.json()
-                    self.appointment_id = data["appointment_id"]
-                    
-                    # Verify all new fields are present and correct
-                    category_correct = data.get("category") == "doctor"
-                    bp_correct = data.get("blood_pressure") == "130/85"
-                    weight_correct = data.get("weight") == "72.5 kg"
-                    
-                    if category_correct and bp_correct and weight_correct:
-                        self.log("✅ Create appointment with new fields PASSED")
-                        self.log(f"   Appointment ID: {self.appointment_id}")
-                        self.log(f"   Category: {data.get('category')}")
-                        self.log(f"   Blood Pressure: {data.get('blood_pressure')}")
-                        self.log(f"   Weight: {data.get('weight')}")
-                        return True
-                    else:
-                        self.log("❌ Create appointment FAILED - New fields not properly saved")
-                        self.log(f"   Category correct: {'✓' if category_correct else '✗'}")
-                        self.log(f"   Blood pressure correct: {'✓' if bp_correct else '✗'}")
-                        self.log(f"   Weight correct: {'✓' if weight_correct else '✗'}")
-                        return False
+                    self.note_id = data["note_id"]
+                    self.log(f"✅ Note created successfully: {self.note_id}")
+                    self.log(f"   Content: {data['content'][:50]}...")
+                    self.log(f"   Category: {data['category']}")
+                    return True
                 else:
-                    self.log(f"❌ Create appointment FAILED: {response.status_code} - {response.text}")
+                    self.log(f"❌ Note creation failed: {response.status_code} - {response.text}")
                     return False
         except Exception as e:
-            self.log(f"❌ Create appointment error: {str(e)}")
+            self.log(f"❌ Note creation error: {str(e)}")
             return False
 
-    async def test_create_appointment_different_categories(self) -> bool:
-        """Test creating appointments with different category types"""
-        categories_to_test = [
-            ("psw", "Personal Support Worker Visit"),
-            ("grooming", "Hair Appointment"),
-            ("footcare", "Podiatrist - Nail Trim"),
-            ("respite", "Respite Care Day Program"),
-            ("therapy", "Physiotherapy Session"),
-            ("other", "Dental Cleaning")
-        ]
-        
+    async def test_update_note(self) -> bool:
+        """Test PUT /api/care-recipients/{recipient_id}/notes/{note_id} - Update note"""
         try:
-            all_passed = True
-            created_appointments = []
-            
-            for category, title in categories_to_test:
-                appointment_data = {
-                    "title": title,
-                    "date": "2025-07-01", 
-                    "time": "2:00 PM",
-                    "category": category,
-                    "notes": f"Testing {category} category appointment"
-                }
-
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    response = await client.post(
-                        f"{self.base_url}/care-recipients/{self.care_recipient_id}/appointments",
-                        json=appointment_data,
-                        headers=self.headers
-                    )
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        if data.get("category") == category:
-                            self.log(f"✅ Category '{category}' appointment created successfully")
-                            created_appointments.append(data["appointment_id"])
-                        else:
-                            self.log(f"❌ Category '{category}' not saved correctly")
-                            all_passed = False
-                    else:
-                        self.log(f"❌ Failed to create '{category}' appointment: {response.status_code}")
-                        all_passed = False
-
-            if all_passed:
-                self.log("✅ All category types test PASSED")
-                return True
-            else:
-                self.log("❌ Category types test FAILED")
+            if not self.note_id:
+                self.log("❌ Note update test FAILED - No note ID available")
                 return False
                 
-        except Exception as e:
-            self.log(f"❌ Category types test error: {str(e)}")
-            return False
-
-    async def test_update_appointment(self) -> bool:
-        """Test PUT /api/care-recipients/{recipient_id}/appointments/{appointment_id} - Update appointment"""
-        try:
-            if not self.appointment_id:
-                self.log("❌ Update test FAILED - No appointment ID available")
-                return False
-                
-            updated_data = {
-                "title": "UPDATED: Annual Physical + Blood Work",
-                "date": "2025-06-16", 
-                "time": "11:30 AM",
-                "doctor_name": "Dr. Sarah Johnson, MD",
-                "location": "Vancouver General Hospital - Lab & Medical Center",
-                "category": "doctor",
-                "blood_pressure": "128/82",
-                "weight": "71.8 kg",
-                "notes": "Updated appointment - added blood work and updated vitals from pre-visit"
+            updated_note_data = {
+                "content": "UPDATED: Eleanor's medication schedule has changed. She now takes extended-release metformin once daily at breakfast (500mg) and continues insulin before dinner. Added vitamin D supplement twice weekly.",
+                "category": "care_plan",
+                "photo": None
             }
 
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.put(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/appointments/{self.appointment_id}",
-                    json=updated_data,
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/notes/{self.note_id}",
+                    json=updated_note_data,
                     headers=self.headers
                 )
                 
@@ -225,195 +145,293 @@ class AppointmentsAPITest:
                     data = response.json()
                     
                     # Verify all fields were updated correctly
-                    title_updated = data.get("title") == "UPDATED: Annual Physical + Blood Work"
-                    date_updated = data.get("date") == "2025-06-16"
-                    bp_updated = data.get("blood_pressure") == "128/82"
-                    weight_updated = data.get("weight") == "71.8 kg"
+                    content_updated = "UPDATED:" in data.get("content", "")
+                    category_updated = data.get("category") == "care_plan"
+                    has_updated_at = "updated_at" in data
                     
-                    if title_updated and date_updated and bp_updated and weight_updated:
-                        self.log("✅ Update appointment PASSED")
-                        self.log(f"   Updated title: {data.get('title')}")
-                        self.log(f"   Updated date: {data.get('date')}")
-                        self.log(f"   Updated blood pressure: {data.get('blood_pressure')}")
-                        self.log(f"   Updated weight: {data.get('weight')}")
+                    if content_updated and category_updated:
+                        self.log("✅ Note update PASSED")
+                        self.log(f"   Updated content: {data.get('content')[:60]}...")
+                        self.log(f"   Updated category: {data.get('category')}")
+                        self.log(f"   Has updated_at field: {'✓' if has_updated_at else '✗'}")
                         return True
                     else:
-                        self.log("❌ Update appointment FAILED - Fields not properly updated")
-                        self.log(f"   Title updated: {'✓' if title_updated else '✗'}")
-                        self.log(f"   Date updated: {'✓' if date_updated else '✗'}")
-                        self.log(f"   BP updated: {'✓' if bp_updated else '✗'}")
-                        self.log(f"   Weight updated: {'✓' if weight_updated else '✗'}")
+                        self.log("❌ Note update FAILED - Fields not properly updated")
+                        self.log(f"   Content updated: {'✓' if content_updated else '✗'}")
+                        self.log(f"   Category updated: {'✓' if category_updated else '✗'}")
                         return False
                 else:
-                    self.log(f"❌ Update appointment FAILED: {response.status_code} - {response.text}")
+                    self.log(f"❌ Note update FAILED: {response.status_code} - {response.text}")
                     return False
         except Exception as e:
-            self.log(f"❌ Update appointment error: {str(e)}")
+            self.log(f"❌ Note update error: {str(e)}")
             return False
 
-    async def test_list_appointments(self) -> bool:
-        """Test GET /api/care-recipients/{recipient_id}/appointments - List appointments"""
+    async def verify_note_persistence(self) -> bool:
+        """Verify note update persists by fetching all notes"""
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/appointments",
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/notes",
                     headers=self.headers
                 )
                 
                 if response.status_code == 200:
-                    data = response.json()
-                    if isinstance(data, list) and len(data) > 0:
-                        # Find our test appointment
-                        test_appointment = None
-                        for appt in data:
-                            if appt.get("appointment_id") == self.appointment_id:
-                                test_appointment = appt
+                    notes = response.json()
+                    if isinstance(notes, list) and len(notes) > 0:
+                        # Find our updated note
+                        updated_note = None
+                        for note in notes:
+                            if note.get("note_id") == self.note_id:
+                                updated_note = note
                                 break
                         
-                        if test_appointment:
-                            # Verify new fields appear in the response
-                            has_category = "category" in test_appointment
-                            has_bp = "blood_pressure" in test_appointment
-                            has_weight = "weight" in test_appointment
+                        if updated_note:
+                            content_persisted = "UPDATED:" in updated_note.get("content", "")
+                            category_persisted = updated_note.get("category") == "care_plan"
                             
-                            if has_category and has_bp and has_weight:
-                                self.log("✅ List appointments PASSED")
-                                self.log(f"   Found {len(data)} appointment(s)")
-                                self.log(f"   New fields present: category='{test_appointment.get('category')}', bp='{test_appointment.get('blood_pressure')}', weight='{test_appointment.get('weight')}'")
+                            if content_persisted and category_persisted:
+                                self.log("✅ Note persistence verification PASSED")
+                                self.log(f"   Updated content found in database")
+                                self.log(f"   Category correctly saved: {updated_note.get('category')}")
                                 return True
                             else:
-                                self.log("❌ List appointments FAILED - New fields missing from response")
-                                self.log(f"   Has category: {'✓' if has_category else '✗'}")
-                                self.log(f"   Has blood_pressure: {'✓' if has_bp else '✗'}")
-                                self.log(f"   Has weight: {'✓' if has_weight else '✗'}")
+                                self.log("❌ Note persistence FAILED - Updates not saved to database")
                                 return False
                         else:
-                            self.log("❌ List appointments FAILED - Test appointment not found in list")
+                            self.log("❌ Note persistence FAILED - Updated note not found")
                             return False
                     else:
-                        self.log("❌ List appointments FAILED - No appointments returned")
+                        self.log("❌ Note persistence FAILED - No notes returned")
                         return False
                 else:
-                    self.log(f"❌ List appointments FAILED: {response.status_code} - {response.text}")
+                    self.log(f"❌ Note persistence verification FAILED: {response.status_code} - {response.text}")
                     return False
         except Exception as e:
-            self.log(f"❌ List appointments error: {str(e)}")
+            self.log(f"❌ Note persistence verification error: {str(e)}")
             return False
 
-    async def test_delete_appointment(self) -> bool:
-        """Test DELETE /api/care-recipients/{recipient_id}/appointments/{appointment_id} - Delete appointment"""
+    async def create_incident(self) -> bool:
+        """Create a test incident to edit later"""
         try:
-            if not self.appointment_id:
-                self.log("❌ Delete test FAILED - No appointment ID available")
-                return False
-
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.delete(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/appointments/{self.appointment_id}",
-                    headers=self.headers
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    if "message" in data and "deleted" in data["message"].lower():
-                        self.log("✅ Delete appointment PASSED")
-                        self.log(f"   Success message: {data['message']}")
-                        return True
-                    else:
-                        self.log("❌ Delete appointment FAILED - No proper success message")
-                        return False
-                else:
-                    self.log(f"❌ Delete appointment FAILED: {response.status_code} - {response.text}")
-                    return False
-        except Exception as e:
-            self.log(f"❌ Delete appointment error: {str(e)}")
-            return False
-
-    async def test_authentication_required(self) -> bool:
-        """Test that authentication is required (401 without token)"""
-        try:
-            headers_no_auth = {"Content-Type": "application/json"}
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/appointments",
-                    json={"title": "Test", "date": "2025-01-01"},
-                    headers=headers_no_auth
-                )
-                
-                if response.status_code == 401:
-                    self.log("✅ Authentication test PASSED - 401 returned without token")
-                    return True
-                else:
-                    self.log(f"❌ Authentication test FAILED - Expected 401, got {response.status_code}")
-                    return False
-        except Exception as e:
-            self.log(f"❌ Authentication test error: {str(e)}")
-            return False
-
-    async def test_access_control(self) -> bool:
-        """Test access control with non-existent recipient (404 if not a caregiver)"""
-        try:
-            fake_recipient_id = f"cr_{uuid.uuid4().hex[:12]}"
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(
-                    f"{self.base_url}/care-recipients/{fake_recipient_id}/appointments",
-                    headers=self.headers
-                )
-                
-                if response.status_code == 404:
-                    self.log("✅ Access control test PASSED - 404 returned for non-existent recipient")
-                    return True
-                else:
-                    self.log(f"❌ Access control test FAILED - Expected 404, got {response.status_code}")
-                    return False
-        except Exception as e:
-            self.log(f"❌ Access control test error: {str(e)}")
-            return False
-
-    async def test_existing_functionality_still_works(self) -> bool:
-        """Test that existing appointment functionality still works without new fields"""
-        try:
-            # Create appointment with only legacy fields (no category, blood_pressure, weight)
-            legacy_appointment = {
-                "title": "Legacy Appointment Test",
-                "date": "2025-08-01",
-                "time": "3:00 PM",
-                "doctor_name": "Dr. Legacy Test",
-                "location": "Old Clinic",
-                "notes": "Testing backwards compatibility"
+            incident_data = {
+                "incident_type": "fall",
+                "description": "Eleanor slipped in the bathroom near the shower. She was reaching for her towel when she lost her balance.",
+                "severity": "minor",
+                "location": "bathroom",
+                "injuries": "Small bruise on left elbow, no bleeding",
+                "action_taken": "Helped her sit down, applied ice pack to elbow, monitored for 30 minutes",
+                "photo": None
             }
 
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
-                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/appointments",
-                    json=legacy_appointment,
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/incidents",
+                    json=incident_data,
                     headers=self.headers
                 )
                 
                 if response.status_code == 200:
                     data = response.json()
-                    # Should work even without new fields
-                    title_correct = data.get("title") == "Legacy Appointment Test"
-                    has_id = "appointment_id" in data
-                    
-                    if title_correct and has_id:
-                        self.log("✅ Existing functionality test PASSED")
-                        self.log("   Legacy appointment created successfully without new fields")
-                        return True
-                    else:
-                        self.log("❌ Existing functionality test FAILED - Legacy appointment creation broken")
-                        return False
+                    self.incident_id = data["incident_id"]
+                    self.log(f"✅ Incident created successfully: {self.incident_id}")
+                    self.log(f"   Type: {data['incident_type']}")
+                    self.log(f"   Severity: {data['severity']}")
+                    self.log(f"   Location: {data['location']}")
+                    return True
                 else:
-                    self.log(f"❌ Existing functionality test FAILED: {response.status_code} - {response.text}")
+                    self.log(f"❌ Incident creation failed: {response.status_code} - {response.text}")
                     return False
         except Exception as e:
-            self.log(f"❌ Existing functionality test error: {str(e)}")
+            self.log(f"❌ Incident creation error: {str(e)}")
+            return False
+
+    async def test_update_incident(self) -> bool:
+        """Test PUT /api/care-recipients/{recipient_id}/incidents/{incident_id} - Update incident"""
+        try:
+            if not self.incident_id:
+                self.log("❌ Incident update test FAILED - No incident ID available")
+                return False
+                
+            updated_incident_data = {
+                "incident_type": "fall",
+                "description": "UPDATED: Eleanor slipped in the bathroom near the shower while reaching for towel. Follow-up: Installed grab bar and non-slip mat for safety.",
+                "severity": "moderate", 
+                "location": "main bathroom - near shower",
+                "injuries": "Small bruise on left elbow (resolved), minor scrape on knee",
+                "action_taken": "Immediate: Applied ice, monitored vitals. Follow-up: Installed safety equipment, scheduled occupational therapy assessment for bathroom safety evaluation.",
+                "photo": None
+            }
+
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.put(
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/incidents/{self.incident_id}",
+                    json=updated_incident_data,
+                    headers=self.headers
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    # Verify all fields were updated correctly
+                    description_updated = "UPDATED:" in data.get("description", "")
+                    severity_updated = data.get("severity") == "moderate"
+                    location_updated = "main bathroom" in data.get("location", "")
+                    injuries_updated = "scrape on knee" in data.get("injuries", "")
+                    action_updated = "Follow-up:" in data.get("action_taken", "")
+                    
+                    all_updated = description_updated and severity_updated and location_updated and injuries_updated and action_updated
+                    
+                    if all_updated:
+                        self.log("✅ Incident update PASSED")
+                        self.log(f"   Updated description: {data.get('description')[:60]}...")
+                        self.log(f"   Updated severity: {data.get('severity')}")
+                        self.log(f"   Updated location: {data.get('location')}")
+                        self.log(f"   Updated injuries: {data.get('injuries')[:40]}...")
+                        self.log(f"   Updated action: {data.get('action_taken')[:50]}...")
+                        return True
+                    else:
+                        self.log("❌ Incident update FAILED - Fields not properly updated")
+                        self.log(f"   Description updated: {'✓' if description_updated else '✗'}")
+                        self.log(f"   Severity updated: {'✓' if severity_updated else '✗'}")
+                        self.log(f"   Location updated: {'✓' if location_updated else '✗'}")
+                        self.log(f"   Injuries updated: {'✓' if injuries_updated else '✗'}")
+                        self.log(f"   Action updated: {'✓' if action_updated else '✗'}")
+                        return False
+                else:
+                    self.log(f"❌ Incident update FAILED: {response.status_code} - {response.text}")
+                    return False
+        except Exception as e:
+            self.log(f"❌ Incident update error: {str(e)}")
+            return False
+
+    async def verify_incident_persistence(self) -> bool:
+        """Verify incident update persists by fetching all incidents"""
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/incidents",
+                    headers=self.headers
+                )
+                
+                if response.status_code == 200:
+                    incidents = response.json()
+                    if isinstance(incidents, list) and len(incidents) > 0:
+                        # Find our updated incident
+                        updated_incident = None
+                        for incident in incidents:
+                            if incident.get("incident_id") == self.incident_id:
+                                updated_incident = incident
+                                break
+                        
+                        if updated_incident:
+                            description_persisted = "UPDATED:" in updated_incident.get("description", "")
+                            severity_persisted = updated_incident.get("severity") == "moderate"
+                            location_persisted = "main bathroom" in updated_incident.get("location", "")
+                            
+                            if description_persisted and severity_persisted and location_persisted:
+                                self.log("✅ Incident persistence verification PASSED")
+                                self.log(f"   Updated description persisted in database")
+                                self.log(f"   Severity correctly saved: {updated_incident.get('severity')}")
+                                self.log(f"   Location correctly saved: {updated_incident.get('location')}")
+                                return True
+                            else:
+                                self.log("❌ Incident persistence FAILED - Updates not saved to database")
+                                return False
+                        else:
+                            self.log("❌ Incident persistence FAILED - Updated incident not found")
+                            return False
+                    else:
+                        self.log("❌ Incident persistence FAILED - No incidents returned")
+                        return False
+                else:
+                    self.log(f"❌ Incident persistence verification FAILED: {response.status_code} - {response.text}")
+                    return False
+        except Exception as e:
+            self.log(f"❌ Incident persistence verification error: {str(e)}")
+            return False
+
+    async def test_authentication_required(self) -> bool:
+        """Test that authentication is required for edit endpoints"""
+        try:
+            headers_no_auth = {"Content-Type": "application/json"}
+            
+            # Test note update without auth
+            note_response = None
+            if self.note_id:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    note_response = await client.put(
+                        f"{self.base_url}/care-recipients/{self.care_recipient_id}/notes/{self.note_id}",
+                        json={"content": "test", "category": "general"},
+                        headers=headers_no_auth
+                    )
+            
+            # Test incident update without auth
+            incident_response = None
+            if self.incident_id:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    incident_response = await client.put(
+                        f"{self.base_url}/care-recipients/{self.care_recipient_id}/incidents/{self.incident_id}",
+                        json={"incident_type": "test", "description": "test"},
+                        headers=headers_no_auth
+                    )
+            
+            note_auth_correct = note_response and note_response.status_code == 401
+            incident_auth_correct = incident_response and incident_response.status_code == 401
+            
+            if note_auth_correct and incident_auth_correct:
+                self.log("✅ Authentication test PASSED - 401 returned without token for both endpoints")
+                return True
+            else:
+                self.log(f"❌ Authentication test FAILED")
+                if note_response:
+                    self.log(f"   Note update without auth: {note_response.status_code} (expected 401)")
+                if incident_response:
+                    self.log(f"   Incident update without auth: {incident_response.status_code} (expected 401)")
+                return False
+        except Exception as e:
+            self.log(f"❌ Authentication test error: {str(e)}")
+            return False
+
+    async def test_non_existent_resources(self) -> bool:
+        """Test updating non-existent notes and incidents returns 404"""
+        try:
+            fake_note_id = f"note_{uuid.uuid4().hex[:12]}"
+            fake_incident_id = f"inc_{uuid.uuid4().hex[:12]}"
+            
+            # Test updating non-existent note
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                note_response = await client.put(
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/notes/{fake_note_id}",
+                    json={"content": "test", "category": "general"},
+                    headers=self.headers
+                )
+                
+                incident_response = await client.put(
+                    f"{self.base_url}/care-recipients/{self.care_recipient_id}/incidents/{fake_incident_id}",
+                    json={"incident_type": "test", "description": "test"},
+                    headers=self.headers
+                )
+            
+            note_404_correct = note_response.status_code == 404
+            incident_404_correct = incident_response.status_code == 404
+            
+            if note_404_correct and incident_404_correct:
+                self.log("✅ Non-existent resources test PASSED - 404 returned for both")
+                return True
+            else:
+                self.log(f"❌ Non-existent resources test FAILED")
+                self.log(f"   Note update (non-existent): {note_response.status_code} (expected 404)")
+                self.log(f"   Incident update (non-existent): {incident_response.status_code} (expected 404)")
+                return False
+        except Exception as e:
+            self.log(f"❌ Non-existent resources test error: {str(e)}")
             return False
 
     async def run_all_tests(self):
-        """Run all Appointments API tests"""
+        """Run all Notes and Incidents edit tests"""
         self.log("=" * 80)
-        self.log("STARTING APPOINTMENTS API TESTS (Edit, Categories, Vitals)")
+        self.log("STARTING NOTES AND INCIDENTS EDIT FUNCTIONALITY TESTS")
         self.log("=" * 80)
         
         test_results = []
@@ -428,41 +446,41 @@ class AppointmentsAPITest:
             self.log("❌ CRITICAL FAILURE: Could not create care recipient")
             return False
 
-        # 2. Test creating appointment with new fields
-        self.log("\n2. TESTING POST /api/care-recipients/{id}/appointments with new fields...")
-        test_results.append(("Create Appointment (New Fields)", await self.test_create_appointment_with_new_fields()))
+        # 2. Create note for editing
+        self.log("\n2. SETUP - Creating test note...")
+        test_results.append(("Create Note", await self.create_note()))
 
-        # 3. Test different categories
-        self.log("\n3. TESTING all category types...")
-        test_results.append(("Category Types", await self.test_create_appointment_different_categories()))
+        # 3. Test note update
+        self.log("\n3. TESTING PUT /api/care-recipients/{id}/notes/{note_id}...")
+        test_results.append(("Update Note", await self.test_update_note()))
 
-        # 4. Test updating appointment
-        self.log("\n4. TESTING PUT /api/care-recipients/{id}/appointments/{id} update...")
-        test_results.append(("Update Appointment", await self.test_update_appointment()))
+        # 4. Verify note persistence
+        self.log("\n4. VERIFYING note update persistence...")
+        test_results.append(("Note Persistence", await self.verify_note_persistence()))
 
-        # 5. Test listing appointments
-        self.log("\n5. TESTING GET /api/care-recipients/{id}/appointments list...")
-        test_results.append(("List Appointments", await self.test_list_appointments()))
+        # 5. Create incident for editing
+        self.log("\n5. SETUP - Creating test incident...")
+        test_results.append(("Create Incident", await self.create_incident()))
 
-        # 6. Test authentication required
-        self.log("\n6. TESTING authentication requirement...")
+        # 6. Test incident update
+        self.log("\n6. TESTING PUT /api/care-recipients/{id}/incidents/{incident_id}...")
+        test_results.append(("Update Incident", await self.test_update_incident()))
+
+        # 7. Verify incident persistence
+        self.log("\n7. VERIFYING incident update persistence...")
+        test_results.append(("Incident Persistence", await self.verify_incident_persistence()))
+
+        # 8. Test authentication required
+        self.log("\n8. TESTING authentication requirement...")
         test_results.append(("Authentication Required", await self.test_authentication_required()))
 
-        # 7. Test access control
-        self.log("\n7. TESTING access control...")
-        test_results.append(("Access Control", await self.test_access_control()))
-
-        # 8. Test existing functionality still works
-        self.log("\n8. TESTING backwards compatibility (existing functionality)...")
-        test_results.append(("Existing Functionality", await self.test_existing_functionality_still_works()))
-
-        # 9. Test delete appointment (do this last)
-        self.log("\n9. TESTING DELETE /api/care-recipients/{id}/appointments/{id}...")
-        test_results.append(("Delete Appointment", await self.test_delete_appointment()))
+        # 9. Test non-existent resources
+        self.log("\n9. TESTING non-existent resource handling...")
+        test_results.append(("Non-existent Resources", await self.test_non_existent_resources()))
 
         # Summary
         self.log("\n" + "=" * 80)
-        self.log("APPOINTMENTS API TEST RESULTS SUMMARY")
+        self.log("NOTES AND INCIDENTS EDIT TEST RESULTS SUMMARY")
         self.log("=" * 80)
         
         passed = 0
@@ -470,7 +488,7 @@ class AppointmentsAPITest:
         
         for test_name, result in test_results:
             status = "✅ PASSED" if result else "❌ FAILED"
-            self.log(f"{test_name:35} | {status}")
+            self.log(f"{test_name:30} | {status}")
             if result:
                 passed += 1
             else:
@@ -489,7 +507,7 @@ class AppointmentsAPITest:
 
 async def main():
     """Main test execution"""
-    tester = AppointmentsAPITest()
+    tester = NotesIncidentsEditTest()
     success = await tester.run_all_tests()
     return success
 
