@@ -62,8 +62,8 @@ export default function MedicationsTab() {
             <Ionicons name="sparkles" size={14} color={COLORS.white} />
             <Text style={styles.aiChipText}>Check Interactions</Text>
           </TouchableOpacity>
-          <TouchableOpacity testID="add-medication-btn" style={styles.addIconBtn} onPress={() => setShowAdd(true)}>
-            <Ionicons name="add" size={24} color={COLORS.primary} />
+          <TouchableOpacity testID="add-medication-btn" style={styles.addBtn} onPress={() => setShowAdd(true)}>
+            <Ionicons name="add" size={22} color={COLORS.white} />
           </TouchableOpacity>
         </View>
       </View>
@@ -140,7 +140,19 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center' },
   aiChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.secondary, borderRadius: RADIUS.full, paddingVertical: SPACING.xs, paddingHorizontal: SPACING.sm, marginRight: SPACING.sm },
   aiChipText: { color: COLORS.white, fontSize: FONT_SIZES.xs, fontWeight: '700', marginLeft: 4 },
-  addIconBtn: { padding: SPACING.xs },
+  addBtn: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    backgroundColor: COLORS.primary, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
   emptyState: { alignItems: 'center', paddingVertical: SPACING.xxl },
   emptyTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary, marginTop: SPACING.md },
   emptyText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: SPACING.xs },
