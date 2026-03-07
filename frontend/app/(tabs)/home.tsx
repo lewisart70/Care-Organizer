@@ -193,8 +193,6 @@ export default function HomeScreen() {
                 <Text style={styles.addAnotherText}>Add Another Care Recipient</Text>
               </TouchableOpacity>
             )}
-              </View>
-            )}
 
             {/* Stats Cards */}
             {dashboard && (
