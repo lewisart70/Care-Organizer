@@ -869,6 +869,21 @@ async def delete_emergency_contact(recipient_id: str, contact_id: str, user: dic
         raise HTTPException(status_code=404, detail="Contact not found")
     return {"message": "Contact deleted"}
 
+@api_router.put("/care-recipients/{recipient_id}/emergency-contacts/{contact_id}")
+async def update_emergency_contact(recipient_id: str, contact_id: str, data: EmergencyContactCreate, user: dict = Depends(get_current_user)):
+    r = await db.care_recipients.find_one({"recipient_id": recipient_id, "caregivers": user["user_id"]})
+    if not r:
+        raise HTTPException(status_code=404, detail="Care recipient not found")
+    existing = await db.emergency_contacts.find_one({"contact_id": contact_id, "recipient_id": recipient_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    await db.emergency_contacts.update_one(
+        {"contact_id": contact_id, "recipient_id": recipient_id},
+        {"$set": data.dict()}
+    )
+    updated = await db.emergency_contacts.find_one({"contact_id": contact_id}, {"_id": 0})
+    return updated
+
 # ======================== DOCTORS ROUTES ========================
 
 @api_router.post("/care-recipients/{recipient_id}/doctors")

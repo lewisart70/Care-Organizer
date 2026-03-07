@@ -14,6 +14,7 @@ export default function EmergencyContactsScreen() {
   const [contacts, setContacts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [editingContact, setEditingContact] = useState<any>(null);
   const [form, setForm] = useState({ name: '', relationship: '', phone: '', email: '', notes: '', is_primary: false });
   const [saving, setSaving] = useState(false);
   
@@ -41,19 +42,63 @@ export default function EmergencyContactsScreen() {
   }, [selectedRecipientId]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const handleAdd = async () => {
+  const openAddModal = () => {
+    setEditingContact(null);
+    setForm({ name: '', relationship: '', phone: '', email: '', notes: '', is_primary: false });
+    setShowAdd(true);
+  };
+
+  const openEditModal = (contact: any) => {
+    setEditingContact(contact);
+    setForm({
+      name: contact.name || '',
+      relationship: contact.relationship || '',
+      phone: contact.phone || '',
+      email: contact.email || '',
+      notes: contact.notes || '',
+      is_primary: contact.is_primary || false,
+    });
+    setShowAdd(true);
+  };
+
+  const handleSave = async () => {
     if (!form.name.trim() || !form.phone.trim()) { Alert.alert('Required', 'Name and phone are required'); return; }
     setSaving(true);
     try {
-      await api.post(`/care-recipients/${selectedRecipientId}/emergency-contacts`, form);
-      setShowAdd(false); setForm({ name: '', relationship: '', phone: '', email: '', notes: '', is_primary: false });
+      if (editingContact) {
+        // Update existing contact
+        await api.put(`/care-recipients/${selectedRecipientId}/emergency-contacts/${editingContact.contact_id}`, form);
+        Alert.alert('Updated', 'Contact updated successfully');
+      } else {
+        // Create new contact
+        await api.post(`/care-recipients/${selectedRecipientId}/emergency-contacts`, form);
+      }
+      setShowAdd(false);
+      setEditingContact(null);
+      setForm({ name: '', relationship: '', phone: '', email: '', notes: '', is_primary: false });
       await load();
     } catch (e: any) { Alert.alert('Error', e.message); } finally { setSaving(false); }
   };
 
-  const handleDelete = async (id: string) => {
-    try { await api.del(`/care-recipients/${selectedRecipientId}/emergency-contacts/${id}`); await load(); }
-    catch (e: any) { Alert.alert('Error', e.message); }
+  const handleDelete = async (id: string, name: string) => {
+    Alert.alert(
+      'Delete Contact',
+      `Are you sure you want to delete ${name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try { 
+              await api.del(`/care-recipients/${selectedRecipientId}/emergency-contacts/${id}`); 
+              await load(); 
+            }
+            catch (e: any) { Alert.alert('Error', e.message); }
+          }
+        }
+      ]
+    );
   };
 
   const pickDnrDocument = async () => {
@@ -157,7 +202,7 @@ export default function EmergencyContactsScreen() {
       <View style={s.header}>
         <TouchableOpacity testID="back-btn" onPress={() => router.back()}><Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} /></TouchableOpacity>
         <Text style={s.headerTitle}>Emergency Info</Text>
-        <TouchableOpacity testID="add-contact-btn" onPress={() => setShowAdd(true)}>
+        <TouchableOpacity testID="add-contact-btn" onPress={openAddModal}>
           <View style={s.addBtn}>
             <Ionicons name="add" size={22} color={COLORS.white} />
           </View>
@@ -226,7 +271,7 @@ export default function EmergencyContactsScreen() {
                 <Text style={s.emptyText}>Add important contacts for quick access</Text>
               </View>
             ) : contacts.map(c => (
-              <View key={c.contact_id} style={[s.card, c.is_primary && s.primaryCard]}>
+              <TouchableOpacity key={c.contact_id} style={[s.card, c.is_primary && s.primaryCard]} onPress={() => openEditModal(c)} activeOpacity={0.7}>
                 <View style={s.cardHeader}>
                   <View style={[s.avatar, { backgroundColor: c.is_primary ? COLORS.error + '20' : COLORS.primary + '15' }]}>
                     <Ionicons name="person" size={20} color={c.is_primary ? COLORS.error : COLORS.primary} />
@@ -238,36 +283,44 @@ export default function EmergencyContactsScreen() {
                     </View>
                     <Text style={s.cardSub}>{c.relationship}</Text>
                   </View>
-                  <TouchableOpacity testID={`delete-contact-${c.contact_id}`} onPress={() => handleDelete(c.contact_id)}>
-                    <Ionicons name="trash-outline" size={20} color={COLORS.error} />
-                  </TouchableOpacity>
+                  <View style={s.cardActions}>
+                    <TouchableOpacity testID={`edit-contact-${c.contact_id}`} style={s.actionBtn} onPress={() => openEditModal(c)}>
+                      <Ionicons name="pencil" size={18} color={COLORS.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity testID={`delete-contact-${c.contact_id}`} style={s.actionBtn} onPress={() => handleDelete(c.contact_id, c.name)}>
+                      <Ionicons name="trash-outline" size={18} color={COLORS.error} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 <View style={s.contactDetails}>
                   <View style={s.detailRow}><Ionicons name="call" size={16} color={COLORS.primary} /><Text style={s.detailText}>{c.phone}</Text></View>
                   {c.email ? <View style={s.detailRow}><Ionicons name="mail" size={16} color={COLORS.primary} /><Text style={s.detailText}>{c.email}</Text></View> : null}
                 </View>
-              </View>
+                <View style={s.editHint}>
+                  <Text style={s.editHintText}>Tap to edit</Text>
+                </View>
+              </TouchableOpacity>
             ))}
           </>
         )}
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Add Contact Modal */}
+      {/* Add/Edit Contact Modal */}
       <Modal visible={showAdd} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={s.modal}>
           <View style={s.modalHeader}>
-            <TouchableOpacity onPress={() => setShowAdd(false)}><Text style={s.cancelText}>Cancel</Text></TouchableOpacity>
-            <Text style={s.modalTitle}>Add Contact</Text>
-            <TouchableOpacity testID="save-contact-btn" onPress={handleAdd} disabled={saving}>
+            <TouchableOpacity onPress={() => { setShowAdd(false); setEditingContact(null); }}><Text style={s.cancelText}>Cancel</Text></TouchableOpacity>
+            <Text style={s.modalTitle}>{editingContact ? 'Edit Contact' : 'Add Contact'}</Text>
+            <TouchableOpacity testID="save-contact-btn" onPress={handleSave} disabled={saving}>
               {saving ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Text style={s.saveText}>Save</Text>}
             </TouchableOpacity>
           </View>
           <ScrollView style={s.modalBody}>
-            {[{ k: 'name', l: 'Name *', p: 'Contact name' }, { k: 'relationship', l: 'Relationship', p: 'e.g., Daughter' }, { k: 'phone', l: 'Phone *', p: 'Phone number' }, { k: 'email', l: 'Email', p: 'Email address' }, { k: 'notes', l: 'Notes', p: 'Any notes' }].map(({ k, l, p }) => (
+            {[{ k: 'name', l: 'Name *', p: 'Contact name' }, { k: 'relationship', l: 'Relationship', p: 'e.g., Daughter' }, { k: 'phone', l: 'Phone *', p: 'Phone number', kb: 'phone-pad' }, { k: 'email', l: 'Email', p: 'Email address', kb: 'email-address' }, { k: 'notes', l: 'Notes', p: 'Any notes' }].map(({ k, l, p, kb }) => (
               <View key={k} style={s.formGroup}>
                 <Text style={s.formLabel}>{l}</Text>
-                <TextInput testID={`contact-${k}`} style={s.formInput} placeholder={p} placeholderTextColor={COLORS.border} value={(form as any)[k]} onChangeText={v => setForm({ ...form, [k]: v })} />
+                <TextInput testID={`contact-${k}`} style={s.formInput} placeholder={p} placeholderTextColor={COLORS.border} value={(form as any)[k]} onChangeText={v => setForm({ ...form, [k]: v })} keyboardType={(kb as any) || 'default'} autoCapitalize={k === 'email' ? 'none' : 'words'} />
               </View>
             ))}
             <TouchableOpacity testID="toggle-primary" style={s.toggleRow} onPress={() => setForm({ ...form, is_primary: !form.is_primary })}>
@@ -463,9 +516,13 @@ const s = StyleSheet.create({
   primaryBadge: { backgroundColor: COLORS.error + '15', paddingHorizontal: SPACING.sm, paddingVertical: 1, borderRadius: RADIUS.full, marginLeft: SPACING.sm },
   primaryText: { fontSize: 10, fontWeight: '700', color: COLORS.error },
   cardSub: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
+  cardActions: { flexDirection: 'row', gap: SPACING.sm },
+  actionBtn: { padding: SPACING.xs, borderRadius: RADIUS.md },
   contactDetails: { marginTop: SPACING.sm, marginLeft: 52 },
   detailRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   detailText: { fontSize: FONT_SIZES.sm, color: COLORS.textPrimary, marginLeft: SPACING.sm },
+  editHint: { alignItems: 'flex-end', marginTop: SPACING.xs },
+  editHintText: { fontSize: FONT_SIZES.xs, color: COLORS.border, fontStyle: 'italic' },
 
   // Modal
   modal: { flex: 1, backgroundColor: COLORS.background },
