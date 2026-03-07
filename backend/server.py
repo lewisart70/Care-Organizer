@@ -4,8 +4,9 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import asyncio
 from pathlib import Path
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -16,6 +17,7 @@ import json
 import base64
 import io
 from emergentintegrations.llm.openai import OpenAISpeechToText
+import resend
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -28,6 +30,11 @@ db = client[os.environ['DB_NAME']]
 JWT_SECRET = os.environ['JWT_SECRET_KEY']
 JWT_ALGORITHM = "HS256"
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
+
+# Initialize Resend
+resend.api_key = RESEND_API_KEY
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -108,6 +115,11 @@ class ProfilePhotoRequest(BaseModel):
 class SummarizeAppointmentRequest(BaseModel):
     transcript: str
     appointment_title: Optional[str] = None
+
+class CaregiverInviteRequest(BaseModel):
+    email: EmailStr
+    caregiver_name: Optional[str] = None
+    message: Optional[str] = None
 
 class MedicationCreate(BaseModel):
     name: str
@@ -513,6 +525,149 @@ async def list_caregivers(recipient_id: str, user: dict = Depends(get_current_us
     caregiver_ids = r.get("caregivers", [])
     caregivers = await db.users.find({"user_id": {"$in": caregiver_ids}}, {"_id": 0, "password_hash": 0}).to_list(50)
     return caregivers
+
+@api_router.post("/care-recipients/{recipient_id}/invite-caregiver")
+async def invite_caregiver_by_email(recipient_id: str, data: CaregiverInviteRequest, user: dict = Depends(get_current_user)):
+    """Send an email invitation to a caregiver to join the care team."""
+    # Verify user has access to this care recipient
+    r = await db.care_recipients.find_one({"recipient_id": recipient_id, "caregivers": user["user_id"]}, {"_id": 0})
+    if not r:
+        raise HTTPException(status_code=404, detail="Care recipient not found")
+    
+    care_recipient_name = r.get("name", "your loved one")
+    inviter_name = user.get("name", "A caregiver")
+    
+    # Check if the invitee already has an account
+    existing_user = await db.users.find_one({"email": data.email}, {"_id": 0})
+    
+    # Create invite record
+    invite_id = f"inv_{uuid.uuid4().hex[:12]}"
+    invite_record = {
+        "invite_id": invite_id,
+        "recipient_id": recipient_id,
+        "email": data.email,
+        "caregiver_name": data.caregiver_name,
+        "invited_by": user["user_id"],
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.caregiver_invites.insert_one(invite_record)
+    
+    # Prepare email content
+    custom_message = f"<p><em>\"{data.message}\"</em></p>" if data.message else ""
+    
+    if existing_user:
+        # User exists - they just need to accept the invite
+        subject = f"You've been invited to help care for {care_recipient_name}"
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h1 style="color: #D97757;">FamilyCare Organizer</h1>
+            </div>
+            <h2 style="color: #333;">You're Invited to Join a Care Team!</h2>
+            <p>Hi {existing_user.get('name', 'there')},</p>
+            <p><strong>{inviter_name}</strong> has invited you to help care for <strong>{care_recipient_name}</strong> using the FamilyCare Organizer app.</p>
+            {custom_message}
+            <p>Since you already have an account, simply open the app and you'll see the invitation waiting for you.</p>
+            <div style="background-color: #FFF5F0; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 0; color: #D97757;"><strong>What you'll be able to do:</strong></p>
+                <ul style="color: #666;">
+                    <li>View and update medical information</li>
+                    <li>Track medications and appointments</li>
+                    <li>Add caregiver notes</li>
+                    <li>Access emergency contacts</li>
+                </ul>
+            </div>
+            <p style="color: #666; font-size: 14px;">Together, we can provide the best care possible.</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+            <p style="color: #999; font-size: 12px;">This email was sent from FamilyCare Organizer.</p>
+        </div>
+        """
+    else:
+        # New user - they need to register first
+        subject = f"You're invited to help care for {care_recipient_name}"
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h1 style="color: #D97757;">FamilyCare Organizer</h1>
+            </div>
+            <h2 style="color: #333;">You're Invited to Join a Care Team!</h2>
+            <p>Hi{' ' + data.caregiver_name if data.caregiver_name else ''},</p>
+            <p><strong>{inviter_name}</strong> has invited you to help care for <strong>{care_recipient_name}</strong> using the FamilyCare Organizer app.</p>
+            {custom_message}
+            <div style="background-color: #FFF5F0; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 0; color: #D97757;"><strong>Getting Started is Easy:</strong></p>
+                <ol style="color: #666;">
+                    <li>Download the FamilyCare Organizer app</li>
+                    <li>Create an account using this email: <strong>{data.email}</strong></li>
+                    <li>Once registered, you'll automatically be added to the care team</li>
+                </ol>
+            </div>
+            <div style="background-color: #f0f8f0; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 0; color: #27AE60;"><strong>As a caregiver, you'll be able to:</strong></p>
+                <ul style="color: #666;">
+                    <li>View and update medical information</li>
+                    <li>Track medications and appointments</li>
+                    <li>Add caregiver notes and observations</li>
+                    <li>Access emergency contacts</li>
+                </ul>
+            </div>
+            <p style="color: #666; font-size: 14px;">Together, we can provide the best care possible for {care_recipient_name}.</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+            <p style="color: #999; font-size: 12px;">This email was sent from FamilyCare Organizer. If you didn't expect this invitation, you can safely ignore this email.</p>
+        </div>
+        """
+    
+    # Send email via Resend
+    email_sent = False
+    email_error = None
+    
+    try:
+        params = {
+            "from": SENDER_EMAIL,
+            "to": [data.email],
+            "subject": subject,
+            "html": html_content
+        }
+        email_result = await asyncio.to_thread(resend.Emails.send, params)
+        email_sent = True
+        
+        # Update invite record with email status
+        await db.caregiver_invites.update_one(
+            {"invite_id": invite_id},
+            {"$set": {"email_sent": True, "email_id": email_result.get("id")}}
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to send invite email: {str(e)}")
+        email_error = str(e)
+        
+        # Update invite record with failure but don't fail the request
+        await db.caregiver_invites.update_one(
+            {"invite_id": invite_id},
+            {"$set": {"email_sent": False, "email_error": str(e)}}
+        )
+        
+        # Check if it's a Resend domain verification issue (free tier limitation)
+        if "verify a domain" in str(e).lower() or "testing emails" in str(e).lower():
+            # Still return success - the invite is recorded, email just couldn't be sent
+            return {
+                "message": f"Invitation recorded for {data.email}",
+                "invite_id": invite_id,
+                "user_exists": existing_user is not None,
+                "email_sent": False,
+                "email_note": "Email delivery requires domain verification in Resend. The invitation has been saved - please share the app link directly with the caregiver."
+            }
+        
+        # For other errors, raise the exception
+        raise HTTPException(status_code=500, detail=f"Failed to send invitation email: {str(e)}")
+    
+    return {
+        "message": f"Invitation sent to {data.email}",
+        "invite_id": invite_id,
+        "user_exists": existing_user is not None,
+        "email_sent": email_sent
+    }
 
 @api_router.post("/care-recipients/{recipient_id}/profile-photo")
 async def upload_profile_photo(recipient_id: str, data: ProfilePhotoRequest, user: dict = Depends(get_current_user)):

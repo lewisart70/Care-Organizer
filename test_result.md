@@ -271,6 +271,21 @@ metadata:
   test_sequence: 2
   run_ui: true
 
+  - task: "Caregiver email invite endpoint"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/care-recipients/{id}/invite-caregiver endpoint - sends email invites via Resend. Now gracefully handles Resend free tier limitations by recording the invite even if email delivery fails."
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED SUCCESSFULLY - POST /api/care-recipients/{recipient_id}/invite-caregiver endpoint working correctly. Successfully creates invite records, handles Resend free tier limitation gracefully (returns 200 OK with email_sent=false and informative email_note about domain verification). Proper validation (422 for invalid/missing email), authentication (401 without token), and authorization (404 for non-existent recipients). Response structure correct: message, invite_id (inv_ prefix), user_exists, email_sent, and email_note fields. All test scenarios passed."
+
 test_plan:
   current_focus: []
   stuck_tasks: []
@@ -278,6 +293,8 @@ test_plan:
   test_priority: "high_first"
 
 agent_communication:
+  - agent: "main"
+    message: "NEW TASK: Test the Caregiver Email Invite endpoint POST /api/care-recipients/{id}/invite-caregiver. This endpoint uses Resend to send email invites. Note: On Resend free tier, emails can only be sent to the account owner's email. The endpoint now gracefully handles this by returning success with email_sent=false and an email_note explaining the limitation. Test: 1) Register/login user, 2) Create care recipient, 3) Call invite endpoint with test email. Verify it returns 200 with proper response structure including invite_id, user_exists, email_sent, and email_note fields."
   - agent: "main"
     message: "Implemented voice-to-text and profile photo features. Please test the backend endpoints first: POST /api/transcribe, POST /api/care-recipients/{id}/profile-photo, DELETE /api/care-recipients/{id}/profile-photo. Authentication is required - register a test user first."
   - agent: "testing"
@@ -290,3 +307,5 @@ agent_communication:
     message: "FRONTEND TESTING REQUESTED. Test areas: 1) Login screen - verify custom logo displays, Google and Apple sign-in buttons are present and styled correctly. 2) Register new user and login. 3) Add a care recipient - test profile photo picker. 4) Notes screen - verify Tip section and Voice button are present. 5) Appointments screen - verify Tip section, Record button, and AI Summary button. 6) Home screen - verify profile photo thumbnail display."
   - agent: "testing"
     message: "✅ FRONTEND UI TESTING COMPLETE - Comprehensive mobile UI testing completed successfully! All requested features verified and working: 1) Login screen has beautiful custom terra cotta heart logo, properly styled Google/Apple sign-in buttons, and functional form fields. 2) Add Care Recipient has excellent profile photo picker with circular area, camera icon, and 'Add Photo' text. 3) Notes screen includes proper Tip section with voice recording instructions. 4) Appointments screen has prominent 'Pro Tip' section with recording and AI summary guidance. 5) Home screen displays proper greeting and recipient management. All UI elements are mobile-responsive and professionally designed. No critical issues found. MVP frontend is production-ready!"
+  - agent: "testing"
+    message: "✅ CAREGIVER EMAIL INVITE TESTING COMPLETE - POST /api/care-recipients/{recipient_id}/invite-caregiver endpoint tested successfully and working correctly. Tested full flow: user registration → care recipient creation → invite caregiver. Endpoint properly handles Resend free tier limitations by returning 200 OK with email_sent=false and informative email_note about domain verification requirements. All validation working: invalid email format (422), missing email (422), authentication required (401), access control (404 for non-existent recipients). Response structure correct with invite_id (inv_ prefix), message, user_exists, email_sent, and email_note fields. No critical issues found."
