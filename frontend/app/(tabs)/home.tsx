@@ -114,9 +114,20 @@ export default function HomeScreen() {
                     testID={`recipient-${r.recipient_id}`}
                     style={[styles.recipientChipWithPhoto, selectedRecipientId === r.recipient_id && styles.recipientChipActive]}
                     onPress={async () => {
+                      if (selectedRecipientId === r.recipient_id) {
+                        // If already selected, go to profile
+                        router.push('/edit-profile');
+                      } else {
+                        // Otherwise, select this recipient
+                        setSelectedRecipientId(r.recipient_id);
+                        const dash = await api.get(`/dashboard/${r.recipient_id}`);
+                        setDashboard(dash);
+                      }
+                    }}
+                    onLongPress={() => {
+                      // Long press always goes to profile
                       setSelectedRecipientId(r.recipient_id);
-                      const dash = await api.get(`/dashboard/${r.recipient_id}`);
-                      setDashboard(dash);
+                      router.push('/edit-profile');
                     }}
                   >
                     {r.profile_photo ? (
@@ -129,6 +140,9 @@ export default function HomeScreen() {
                     <Text style={[styles.recipientChipText, selectedRecipientId === r.recipient_id && styles.recipientChipTextActive]}>
                       {r.name.split(' ')[0]}
                     </Text>
+                    {selectedRecipientId === r.recipient_id && (
+                      <Ionicons name="chevron-forward" size={14} color={COLORS.primary} />
+                    )}
                   </TouchableOpacity>
                 ))}
                 <TouchableOpacity
@@ -143,11 +157,12 @@ export default function HomeScreen() {
 
             {/* Single Recipient Card with Photo (when only one recipient) */}
             {recipients.length === 1 && (
-              <View style={styles.singleRecipientCard}>
-                <TouchableOpacity 
-                  style={styles.recipientPhotoLarge}
-                  onPress={() => router.push('/edit-profile')}
-                >
+              <TouchableOpacity 
+                style={styles.singleRecipientCard}
+                onPress={() => router.push('/edit-profile')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.recipientPhotoLarge}>
                   {recipients[0].profile_photo ? (
                     <Image source={{ uri: recipients[0].profile_photo }} style={styles.recipientPhotoLargeImg} />
                   ) : (
@@ -155,24 +170,29 @@ export default function HomeScreen() {
                       <Ionicons name="person" size={32} color={COLORS.textSecondary} />
                     </View>
                   )}
-                  <View style={styles.editBadgeSmall}>
-                    <Ionicons name="camera" size={10} color={COLORS.white} />
-                  </View>
-                </TouchableOpacity>
+                </View>
                 <View style={styles.singleRecipientInfo}>
                   <Text style={styles.singleRecipientName}>{recipients[0].name}</Text>
                   {recipients[0].date_of_birth && (
                     <Text style={styles.singleRecipientDob}>DOB: {recipients[0].date_of_birth}</Text>
                   )}
+                  <Text style={styles.tapToEditHint}>Tap to view profile</Text>
                 </View>
-                <TouchableOpacity
-                  testID="add-another-recipient"
-                  style={styles.addAnotherBtn}
-                  onPress={() => router.push('/add-recipient')}
-                >
-                  <Ionicons name="add" size={16} color={COLORS.primary} />
-                  <Text style={styles.addAnotherText}>Add Another</Text>
-                </TouchableOpacity>
+                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            )}
+            
+            {/* Add Another Recipient Button (when single recipient) */}
+            {recipients.length === 1 && (
+              <TouchableOpacity
+                testID="add-another-recipient"
+                style={styles.addAnotherBtnStandalone}
+                onPress={() => router.push('/add-recipient')}
+              >
+                <Ionicons name="person-add" size={16} color={COLORS.primary} />
+                <Text style={styles.addAnotherText}>Add Another Care Recipient</Text>
+              </TouchableOpacity>
+            )}
               </View>
             )}
 
@@ -459,10 +479,20 @@ const styles = StyleSheet.create({
   singleRecipientDob: {
     fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2,
   },
+  tapToEditHint: {
+    fontSize: FONT_SIZES.xs, color: COLORS.primary, marginTop: 4, fontStyle: 'italic',
+  },
   addAnotherBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
     borderRadius: RADIUS.full, borderWidth: 1, borderColor: COLORS.primary,
+  },
+  addAnotherBtnStandalone: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    marginHorizontal: SPACING.lg, marginTop: SPACING.sm, marginBottom: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.primary,
+    borderStyle: 'dashed',
   },
   addAnotherText: {
     fontSize: FONT_SIZES.xs, fontWeight: '600', color: COLORS.primary,
