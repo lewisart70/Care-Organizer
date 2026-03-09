@@ -149,35 +149,55 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Quick Actions - Apple Health Style Grid */}
+        {/* Quick Actions - 3D Button Style Grid */}
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.quickActionsGrid}>
-          <TouchableOpacity style={[styles.quickAction, { backgroundColor: COLORS.primaryLight }]} onPress={() => router.push('/(tabs)/medications-tab')}>
-            <View style={[styles.quickActionIcon, { backgroundColor: COLORS.primary }]}>
+          <TouchableOpacity 
+            style={[styles.quickAction, styles.quickAction3D, { backgroundColor: COLORS.primaryLight }]} 
+            onPress={() => router.push('/(tabs)/medications-tab')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.quickActionHighlight} />
+            <View style={[styles.quickActionIcon, styles.quickActionIcon3D, { backgroundColor: COLORS.primary }]}>
               <Ionicons name="medical" size={22} color={COLORS.white} />
             </View>
             <Text style={styles.quickActionLabel}>Medications</Text>
             <Text style={styles.quickActionCount}>{dashboard?.stats?.medications || 0} active</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.quickAction, { backgroundColor: COLORS.secondaryLight }]} onPress={() => router.push('/(tabs)/appointments-tab')}>
-            <View style={[styles.quickActionIcon, { backgroundColor: COLORS.secondary }]}>
+          <TouchableOpacity 
+            style={[styles.quickAction, styles.quickAction3D, { backgroundColor: COLORS.secondaryLight }]} 
+            onPress={() => router.push('/appointments')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.quickActionHighlight} />
+            <View style={[styles.quickActionIcon, styles.quickActionIcon3D, { backgroundColor: COLORS.secondary }]}>
               <Ionicons name="calendar" size={22} color={COLORS.white} />
             </View>
             <Text style={styles.quickActionLabel}>Appointments</Text>
             <Text style={styles.quickActionCount}>{dashboard?.upcoming_appointments?.length || 0} upcoming</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.quickAction, { backgroundColor: COLORS.infoLight }]} onPress={() => router.push('/(tabs)/notes-tab')}>
-            <View style={[styles.quickActionIcon, { backgroundColor: COLORS.info }]}>
+          <TouchableOpacity 
+            style={[styles.quickAction, styles.quickAction3D, { backgroundColor: COLORS.infoLight }]} 
+            onPress={() => router.push('/(tabs)/notes-tab')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.quickActionHighlight} />
+            <View style={[styles.quickActionIcon, styles.quickActionIcon3D, { backgroundColor: COLORS.info }]}>
               <Ionicons name="document-text" size={22} color={COLORS.white} />
             </View>
             <Text style={styles.quickActionLabel}>Notes</Text>
             <Text style={styles.quickActionCount}>{dashboard?.stats?.notes || 0} total</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.quickAction, { backgroundColor: COLORS.errorLight }]} onPress={() => router.push('/emergency-contacts')}>
-            <View style={[styles.quickActionIcon, { backgroundColor: COLORS.error }]}>
+          <TouchableOpacity 
+            style={[styles.quickAction, styles.quickAction3D, { backgroundColor: COLORS.errorLight }]} 
+            onPress={() => router.push('/emergency-contacts')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.quickActionHighlight} />
+            <View style={[styles.quickActionIcon, styles.quickActionIcon3D, { backgroundColor: COLORS.error }]}>
               <Ionicons name="call" size={22} color={COLORS.white} />
             </View>
             <Text style={styles.quickActionLabel}>Emergency</Text>
@@ -471,6 +491,32 @@ const styles = StyleSheet.create({
     width: '47%',
     borderRadius: RADIUS.xl,
     padding: SPACING.lg,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  // 3D Button Effects
+  quickAction3D: {
+    // Bottom shadow for depth
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    // Inner border for 3D effect
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+    borderRightColor: 'rgba(0,0,0,0.05)',
+  },
+  quickActionHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
   },
   quickActionIcon: {
     width: 44,
@@ -480,9 +526,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.md,
   },
+  quickActionIcon3D: {
+    // Icon 3D effect
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
+    borderWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.3)',
+    borderLeftColor: 'rgba(255,255,255,0.2)',
+    borderBottomColor: 'rgba(0,0,0,0.2)',
+    borderRightColor: 'rgba(0,0,0,0.1)',
+  },
   quickActionLabel: {
     fontSize: FONT_SIZES.md,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.textPrimary,
   },
   quickActionCount: {
