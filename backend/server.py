@@ -648,7 +648,7 @@ async def delete_account(user: dict = Depends(get_current_user)):
         "log_id": f"log_{uuid.uuid4().hex[:12]}",
         "user_id": "DELETED_USER",
         "action": "ACCOUNT_DELETED",
-        "details": f"User account and all associated data permanently deleted",
+        "details": "User account and all associated data permanently deleted",
         "timestamp": datetime.now(timezone.utc).isoformat()
     })
     
@@ -1014,7 +1014,6 @@ async def invite_caregiver_by_email(recipient_id: str, data: CaregiverInviteRequ
     
     # Send email via Resend
     email_sent = False
-    email_error = None
     
     try:
         params = {
@@ -1034,7 +1033,6 @@ async def invite_caregiver_by_email(recipient_id: str, data: CaregiverInviteRequ
         
     except Exception as e:
         logger.error(f"Failed to send invite email: {str(e)}")
-        email_error = str(e)
         
         # Update invite record with failure but don't fail the request
         await db.caregiver_invites.update_one(
@@ -1615,7 +1613,7 @@ async def check_medication_interactions(data: MedicationInteractionRequest, user
             return {"interactions": [], "summary": response, "raw": True}
     except Exception as e:
         logger.error(f"AI medication check error: {e}")
-        return {"interactions": [], "summary": f"Unable to check interactions at this time. Please consult your pharmacist.", "error": str(e)}
+        return {"interactions": [], "summary": "Unable to check interactions at this time. Please consult your pharmacist.", "error": str(e)}
 
 @api_router.post("/ai/smart-reminders")
 async def get_smart_reminders(data: SmartReminderRequest, user: dict = Depends(get_current_user)):
@@ -1802,10 +1800,8 @@ async def get_bathing_status(recipient_id: str, user: dict = Depends(get_current
 
 # ======================== PDF EXPORT ========================
 
-from fastapi.responses import StreamingResponse
-
 @api_router.get("/export/{recipient_id}/pdf")
-async def export_care_report(recipient_id: str, user: dict = Depends(get_current_user)):
+async def export_care_report_legacy(recipient_id: str, user: dict = Depends(get_current_user)):
     r = await db.care_recipients.find_one({"recipient_id": recipient_id, "caregivers": user["user_id"]}, {"_id": 0})
     if not r:
         raise HTTPException(status_code=404, detail="Care recipient not found")
@@ -1817,8 +1813,6 @@ async def export_care_report(recipient_id: str, user: dict = Depends(get_current
     incidents = await db.incidents.find({"recipient_id": recipient_id}, {"_id": 0}).sort("created_at", -1).to_list(20)
     appointments = await db.appointments.find({"recipient_id": recipient_id}, {"_id": 0}).sort("date", 1).to_list(50)
     routines = await db.routines.find({"recipient_id": recipient_id}, {"_id": 0}).to_list(50)
-    bathing_records = await db.bathing.find({"recipient_id": recipient_id}, {"_id": 0}).sort("date", -1).to_list(20)
-    nutrition_records = await db.nutrition.find({"recipient_id": recipient_id}, {"_id": 0}).sort("date", -1).to_list(20)
     legal_items = await db.legal_financial.find({"recipient_id": recipient_id}, {"_id": 0}).to_list(50)
 
     from fpdf import FPDF
@@ -2351,7 +2345,7 @@ def generate_care_report_pdf(care_recipient: dict, data: dict, sections: List[st
         try:
             dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
             return dt.strftime("%b %d, %Y %I:%M %p")
-        except:
+        except Exception:
             return date_str
     
     # Medications Section
@@ -2403,7 +2397,6 @@ def generate_care_report_pdf(care_recipient: dict, data: dict, sections: List[st
     if "incidents" in sections and data.get("incidents"):
         story.append(Paragraph("Incidents & Falls", section_header_style))
         for incident in data["incidents"]:
-            severity_color = "#E74C3C" if incident.get('severity') == 'severe' else "#F39C12" if incident.get('severity') == 'moderate' else "#27AE60"
             incident_text = f"<b>{incident.get('incident_type', '').title()}</b> ({incident.get('severity', '').title()}) - {format_date(incident.get('created_at'))}"
             incident_text += f"<br/>{incident.get('description', '')}"
             if incident.get('action_taken'):

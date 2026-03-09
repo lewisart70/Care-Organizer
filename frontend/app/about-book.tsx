@@ -70,11 +70,11 @@ export default function AboutBookScreen() {
           Caring for an aging parent or loved one is one of the most meaningful and challenging journeys a family can take. Whether you are a family caregiver, a personal support worker, or part of a healthcare team, having the right tools and information at your fingertips can make all the difference.
         </Text>
         <Text style={styles.description}>
-          The Family Care Organizer was created out of a real caregiving journey — a daughter's decision to move her family into her parents' home and navigate the beautiful, complex reality of multigenerational care. Born from lived experience, this practical binder-style guide brings together everything a caregiver needs in one organized, easy-to-use resource.
+          The Family Care Organizer was created out of a real caregiving journey — a daughter&apos;s decision to move her family into her parents&apos; home and navigate the beautiful, complex reality of multigenerational care. Born from lived experience, this practical binder-style guide brings together everything a caregiver needs in one organized, easy-to-use resource.
         </Text>
 
         {/* What's Inside */}
-        <Text style={styles.sectionTitle}>Inside You'll Find</Text>
+        <Text style={styles.sectionTitle}>Inside You&apos;ll Find</Text>
         <View style={styles.featureList}>
           {[
             'Essential record-keeping forms for medical information, medications, doctor contacts, and daily routines',
@@ -96,10 +96,10 @@ export default function AboutBookScreen() {
         <View style={styles.quoteBox}>
           <Ionicons name="heart" size={24} color={COLORS.primary} />
           <Text style={styles.quoteText}>
-            "Written with both compassion and practicality, The Family Care Organizer meets caregivers exactly where they are — providing structure on the hard days and reassurance on all the rest."
+            &quot;Written with both compassion and practicality, The Family Care Organizer meets caregivers exactly where they are — providing structure on the hard days and reassurance on all the rest.&quot;
           </Text>
           <Text style={styles.quoteFooter}>
-            You don't have to have everything figured out. This binder grows with you.
+            You don&apos;t have to have everything figured out. This binder grows with you.
           </Text>
         </View>
 

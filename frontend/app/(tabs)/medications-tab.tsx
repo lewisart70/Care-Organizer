@@ -7,6 +7,16 @@ import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/utils/api';
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../../src/constants/theme';
 
+// Medication time colors (Medisafe-inspired)
+const TIME_COLORS: Record<string, string> = {
+  morning: '#F59E0B',
+  afternoon: '#3B82F6',
+  evening: '#8B5CF6',
+  night: '#6366F1',
+  'with meals': '#10B981',
+  'as needed': '#EC4899',
+};
+
 export default function MedicationsTab() {
   const { selectedRecipientId } = useAuth();
   const router = useRouter();
@@ -20,7 +30,6 @@ export default function MedicationsTab() {
   const [pharmacyInfo, setPharmacyInfo] = useState<any>({ name: '', address: '', phone: '', fax: '', website: '' });
   const [showPharmacyModal, setShowPharmacyModal] = useState(false);
   const [savingPharmacy, setSavingPharmacy] = useState(false);
-  const [pharmacyExpanded, setPharmacyExpanded] = useState(false);
 
   const loadMeds = useCallback(async () => {
     if (!selectedRecipientId) { setLoading(false); return; }
@@ -55,13 +64,18 @@ export default function MedicationsTab() {
   };
 
   const handleDelete = async (medId: string) => {
-    try {
-      await api.del(`/care-recipients/${selectedRecipientId}/medications/${medId}`);
-      await loadMeds();
-    } catch (e: any) { Alert.alert('Error', e.message); }
+    Alert.alert('Delete Medication', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try {
+          await api.del(`/care-recipients/${selectedRecipientId}/medications/${medId}`);
+          await loadMeds();
+        } catch (e: any) { Alert.alert('Error', e.message); }
+      }}
+    ]);
   };
 
-  const savePharmacy = async () => {
+  const handleSavePharmacy = async () => {
     setSavingPharmacy(true);
     try {
       await api.patch(`/care-recipients/${selectedRecipientId}`, { pharmacy_info: pharmacyInfo });
@@ -71,199 +85,215 @@ export default function MedicationsTab() {
     finally { setSavingPharmacy(false); }
   };
 
-  const callPharmacy = () => {
-    if (pharmacyInfo.phone) {
-      Linking.openURL(`tel:${pharmacyInfo.phone}`);
-    }
+  const getTimeColor = (timeOfDay: string) => {
+    const key = timeOfDay?.toLowerCase() || '';
+    return TIME_COLORS[key] || COLORS.primary;
   };
-
-  const openWebsite = () => {
-    if (pharmacyInfo.website) {
-      let url = pharmacyInfo.website;
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = 'https://' + url;
-      }
-      Linking.openURL(url);
-    }
-  };
-
-  const hasPharmacyInfo = pharmacyInfo.name || pharmacyInfo.phone;
 
   if (!selectedRecipientId) {
-    return <SafeAreaView style={styles.container}><View style={styles.centered}><Text style={styles.emptyText}>Select a care recipient first</Text></View></SafeAreaView>;
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centered}>
+          <Ionicons name="medical-outline" size={48} color={COLORS.textMuted} />
+          <Text style={styles.emptyTitle}>No Care Recipient Selected</Text>
+          <Text style={styles.emptyText}>Select someone from the Home tab</Text>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Medications</Text>
-        <TouchableOpacity testID="add-medication-btn" style={styles.addBtn} onPress={() => setShowAdd(true)}>
-          <Ionicons name="add" size={22} color={COLORS.white} />
+        <View>
+          <Text style={styles.headerTitle}>Medications</Text>
+          <Text style={styles.headerSubtitle}>{meds.length} active medications</Text>
+        </View>
+        <TouchableOpacity style={styles.addButton} onPress={() => setShowAdd(true)}>
+          <Ionicons name="add" size={24} color={COLORS.white} />
         </TouchableOpacity>
       </View>
 
-      {/* AI Interaction Checker - moved below header */}
-      <TouchableOpacity testID="check-interactions-btn" style={styles.aiCheckerBar} onPress={() => router.push('/medication-checker')}>
-        <View style={styles.aiCheckerLeft}>
-          <Ionicons name="sparkles" size={18} color={COLORS.secondary} />
-          <Text style={styles.aiCheckerText}>AI Medication Interaction Checker</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
-      </TouchableOpacity>
-
-      {/* Pharmacy Card */}
-      <TouchableOpacity 
-        style={styles.pharmacyCard} 
-        onPress={() => setPharmacyExpanded(!pharmacyExpanded)}
-        activeOpacity={0.7}
+      <ScrollView 
+        refreshControl={<RefreshControl refreshing={false} onRefresh={loadMeds} tintColor={COLORS.primary} />}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        <View style={styles.pharmacyHeader}>
-          <View style={styles.pharmacyIcon}>
-            <Ionicons name="storefront" size={20} color={COLORS.info} />
-          </View>
-          <View style={styles.pharmacyHeaderText}>
-            <Text style={styles.pharmacyTitle}>Pharmacy</Text>
-            {hasPharmacyInfo ? (
-              <Text style={styles.pharmacyName}>{pharmacyInfo.name || 'Tap to view'}</Text>
-            ) : (
-              <Text style={styles.pharmacyEmpty}>Add pharmacy information</Text>
-            )}
-          </View>
-          <View style={styles.pharmacyActions}>
-            <TouchableOpacity style={styles.pharmacyEditBtn} onPress={() => setShowPharmacyModal(true)}>
-              <Ionicons name="pencil" size={16} color={COLORS.info} />
-            </TouchableOpacity>
-            <Ionicons name={pharmacyExpanded ? "chevron-up" : "chevron-down"} size={20} color={COLORS.textSecondary} />
-          </View>
-        </View>
-        
-        {pharmacyExpanded && hasPharmacyInfo && (
-          <View style={styles.pharmacyDetails}>
-            {pharmacyInfo.address && (
-              <View style={styles.pharmacyDetailRow}>
-                <Ionicons name="location" size={14} color={COLORS.textSecondary} />
-                <Text style={styles.pharmacyDetailText}>{pharmacyInfo.address}</Text>
-              </View>
-            )}
-            {pharmacyInfo.phone && (
-              <TouchableOpacity style={styles.pharmacyDetailRow} onPress={callPharmacy}>
-                <Ionicons name="call" size={14} color={COLORS.primary} />
-                <Text style={[styles.pharmacyDetailText, { color: COLORS.primary }]}>{pharmacyInfo.phone}</Text>
-              </TouchableOpacity>
-            )}
-            {pharmacyInfo.fax && (
-              <View style={styles.pharmacyDetailRow}>
-                <Ionicons name="print" size={14} color={COLORS.textSecondary} />
-                <Text style={styles.pharmacyDetailText}>Fax: {pharmacyInfo.fax}</Text>
-              </View>
-            )}
-            {pharmacyInfo.website && (
-              <TouchableOpacity style={styles.pharmacyDetailRow} onPress={openWebsite}>
-                <Ionicons name="globe" size={14} color={COLORS.info} />
-                <Text style={[styles.pharmacyDetailText, { color: COLORS.info }]}>{pharmacyInfo.website}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-      </TouchableOpacity>
-
-      <ScrollView refreshControl={<RefreshControl refreshing={false} onRefresh={loadMeds} tintColor={COLORS.primary} />}>
-        {loading ? <ActivityIndicator color={COLORS.primary} style={{ marginTop: SPACING.xl }} /> :
-          meds.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="medkit-outline" size={48} color={COLORS.primaryLight} />
-              <Text style={styles.emptyTitle}>No medications yet</Text>
-              <Text style={styles.emptyText}>Add medications to track dosages and schedules</Text>
-            </View>
-          ) : meds.map((med) => (
-            <View key={med.medication_id} style={styles.medCard}>
-              <View style={styles.medHeader}>
-                <View style={styles.medIcon}><Ionicons name="medical" size={20} color={COLORS.primary} /></View>
-                <View style={styles.medInfo}>
-                  <Text style={styles.medName}>{med.name}</Text>
-                  <Text style={styles.medDosage}>{med.dosage} • {med.frequency}</Text>
+        {loading ? (
+          <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: SPACING.xxl }} />
+        ) : (
+          <>
+            {/* Pharmacy Card */}
+            <TouchableOpacity style={styles.pharmacyCard} onPress={() => setShowPharmacyModal(true)}>
+              <View style={styles.pharmacyHeader}>
+                <View style={styles.pharmacyIcon}>
+                  <Ionicons name="storefront" size={22} color={COLORS.secondary} />
                 </View>
-                <TouchableOpacity testID={`delete-med-${med.medication_id}`} onPress={() => handleDelete(med.medication_id)}>
-                  <Ionicons name="trash-outline" size={20} color={COLORS.error} />
-                </TouchableOpacity>
+                <View style={styles.pharmacyInfo}>
+                  <Text style={styles.pharmacyLabel}>Pharmacy</Text>
+                  <Text style={styles.pharmacyName}>
+                    {pharmacyInfo.name || 'Tap to add pharmacy info'}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
               </View>
-              {med.time_of_day ? <View style={styles.medDetail}><Ionicons name="time-outline" size={14} color={COLORS.textSecondary} /><Text style={styles.medDetailText}>{med.time_of_day}</Text></View> : null}
-              {med.instructions ? <View style={styles.medDetail}><Ionicons name="information-circle-outline" size={14} color={COLORS.textSecondary} /><Text style={styles.medDetailText}>{med.instructions}</Text></View> : null}
-              {med.prescribing_doctor ? <View style={styles.medDetail}><Ionicons name="person-outline" size={14} color={COLORS.textSecondary} /><Text style={styles.medDetailText}>Dr. {med.prescribing_doctor}</Text></View> : null}
-            </View>
-          ))}
+              {pharmacyInfo.phone && (
+                <TouchableOpacity 
+                  style={styles.pharmacyAction}
+                  onPress={() => Linking.openURL(`tel:${pharmacyInfo.phone}`)}
+                >
+                  <Ionicons name="call" size={16} color={COLORS.success} />
+                  <Text style={styles.pharmacyActionText}>{pharmacyInfo.phone}</Text>
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
+
+            {/* Medications List */}
+            {meds.length === 0 ? (
+              <View style={styles.emptyState}>
+                <View style={styles.emptyIcon}>
+                  <Ionicons name="medical" size={40} color={COLORS.primary} />
+                </View>
+                <Text style={styles.emptyTitle}>No medications added</Text>
+                <Text style={styles.emptyText}>Tap the + button to add medications</Text>
+              </View>
+            ) : (
+              meds.map(med => (
+                <View key={med.medication_id} style={styles.medCard}>
+                  <View style={styles.medHeader}>
+                    <View style={[styles.medTimeIndicator, { backgroundColor: getTimeColor(med.time_of_day) }]} />
+                    <View style={styles.medInfo}>
+                      <Text style={styles.medName}>{med.name}</Text>
+                      <Text style={styles.medDosage}>{med.dosage}</Text>
+                    </View>
+                    <TouchableOpacity 
+                      style={styles.deleteButton}
+                      onPress={() => handleDelete(med.medication_id)}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={COLORS.error} />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  <View style={styles.medDetails}>
+                    <View style={styles.medDetailRow}>
+                      <Ionicons name="repeat" size={16} color={COLORS.textSecondary} />
+                      <Text style={styles.medDetailText}>{med.frequency}</Text>
+                    </View>
+                    {med.time_of_day && (
+                      <View style={styles.medDetailRow}>
+                        <Ionicons name="time" size={16} color={COLORS.textSecondary} />
+                        <Text style={styles.medDetailText}>{med.time_of_day}</Text>
+                      </View>
+                    )}
+                  </View>
+                  
+                  {med.instructions && (
+                    <View style={styles.medInstructions}>
+                      <Text style={styles.medInstructionsText}>{med.instructions}</Text>
+                    </View>
+                  )}
+                  
+                  {med.prescribing_doctor && (
+                    <View style={styles.medDoctor}>
+                      <Ionicons name="person" size={14} color={COLORS.textMuted} />
+                      <Text style={styles.medDoctorText}>Dr. {med.prescribing_doctor}</Text>
+                    </View>
+                  )}
+                </View>
+              ))
+            )}
+          </>
+        )}
+        
+        <View style={{ height: SPACING.xxxl }} />
       </ScrollView>
 
+      {/* Add Medication Modal */}
       <Modal visible={showAdd} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity testID="close-add-med-modal" onPress={() => setShowAdd(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowAdd(false)}>
+              <Text style={styles.modalCancel}>Cancel</Text>
+            </TouchableOpacity>
             <Text style={styles.modalTitle}>Add Medication</Text>
-            <TouchableOpacity testID="save-medication-btn" onPress={handleAdd} disabled={saving}>
-              {saving ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Text style={styles.saveText}>Save</Text>}
+            <TouchableOpacity onPress={handleAdd} disabled={saving}>
+              {saving ? <ActivityIndicator size="small" color={COLORS.primary} /> : 
+                <Text style={styles.modalSave}>Save</Text>}
             </TouchableOpacity>
           </View>
-          <ScrollView style={styles.modalBody}>
+          
+          <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
             {[
-              { key: 'name', label: 'Medication Name *', placeholder: 'e.g., Metformin' },
-              { key: 'dosage', label: 'Dosage *', placeholder: 'e.g., 500mg' },
-              { key: 'frequency', label: 'Frequency *', placeholder: 'e.g., Twice daily' },
-              { key: 'time_of_day', label: 'Time of Day', placeholder: 'e.g., Morning and Evening' },
+              { key: 'name', label: 'Medication Name *', placeholder: 'e.g., Aspirin' },
+              { key: 'dosage', label: 'Dosage *', placeholder: 'e.g., 100mg' },
+              { key: 'frequency', label: 'Frequency *', placeholder: 'e.g., Once daily' },
+              { key: 'time_of_day', label: 'Time of Day', placeholder: 'e.g., Morning' },
+              { key: 'instructions', label: 'Special Instructions', placeholder: 'e.g., Take with food', multiline: true },
               { key: 'prescribing_doctor', label: 'Prescribing Doctor', placeholder: 'Doctor name' },
-              { key: 'instructions', label: 'Special Instructions', placeholder: 'e.g., Take with food' },
-            ].map(({ key, label, placeholder }) => (
-              <View key={key} style={styles.formGroup}>
-                <Text style={styles.formLabel}>{label}</Text>
+            ].map(field => (
+              <View key={field.key} style={styles.formGroup}>
+                <Text style={styles.formLabel}>{field.label}</Text>
                 <TextInput
-                  testID={`med-input-${key}`}
-                  style={styles.formInput}
-                  placeholder={placeholder}
-                  placeholderTextColor={COLORS.border}
-                  value={(form as any)[key]}
-                  onChangeText={(v) => setForm({ ...form, [key]: v })}
+                  style={[styles.formInput, field.multiline && styles.formTextarea]}
+                  placeholder={field.placeholder}
+                  placeholderTextColor={COLORS.textMuted}
+                  value={(form as any)[field.key]}
+                  onChangeText={v => setForm({ ...form, [field.key]: v })}
+                  multiline={field.multiline}
                 />
               </View>
             ))}
+            
+            {/* Time of Day Quick Select */}
+            <Text style={styles.formLabel}>Quick Select Time</Text>
+            <View style={styles.timeChips}>
+              {Object.entries(TIME_COLORS).map(([time, color]) => (
+                <TouchableOpacity
+                  key={time}
+                  style={[styles.timeChip, form.time_of_day.toLowerCase() === time && { backgroundColor: color }]}
+                  onPress={() => setForm({ ...form, time_of_day: time.charAt(0).toUpperCase() + time.slice(1) })}
+                >
+                  <Text style={[styles.timeChipText, form.time_of_day.toLowerCase() === time && { color: COLORS.white }]}>
+                    {time.charAt(0).toUpperCase() + time.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </ScrollView>
         </SafeAreaView>
       </Modal>
-      
-      {/* Pharmacy Edit Modal */}
+
+      {/* Pharmacy Modal */}
       <Modal visible={showPharmacyModal} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowPharmacyModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowPharmacyModal(false)}>
+              <Text style={styles.modalCancel}>Cancel</Text>
+            </TouchableOpacity>
             <Text style={styles.modalTitle}>Pharmacy Info</Text>
-            <TouchableOpacity onPress={savePharmacy} disabled={savingPharmacy}>
-              {savingPharmacy ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Text style={styles.saveText}>Save</Text>}
+            <TouchableOpacity onPress={handleSavePharmacy} disabled={savingPharmacy}>
+              {savingPharmacy ? <ActivityIndicator size="small" color={COLORS.primary} /> : 
+                <Text style={styles.modalSave}>Save</Text>}
             </TouchableOpacity>
           </View>
-          <ScrollView style={styles.modalBody}>
-            <View style={styles.pharmacyTip}>
-              <Ionicons name="information-circle" size={18} color={COLORS.info} />
-              <Text style={styles.pharmacyTipText}>
-                Keep pharmacy details handy for refills and prescription transfers
-              </Text>
-            </View>
+          
+          <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
             {[
-              { key: 'name', label: 'Pharmacy Name', placeholder: 'e.g., Shoppers Drug Mart', icon: 'storefront' },
-              { key: 'address', label: 'Address', placeholder: 'Full pharmacy address', icon: 'location' },
-              { key: 'phone', label: 'Phone Number', placeholder: 'e.g., 555-123-4567', icon: 'call', kb: 'phone-pad' },
-              { key: 'fax', label: 'Fax Number', placeholder: 'e.g., 555-123-4568', icon: 'print', kb: 'phone-pad' },
-              { key: 'website', label: 'Website', placeholder: 'e.g., www.pharmacy.com', icon: 'globe', kb: 'url' },
-            ].map(({ key, label, placeholder, icon, kb }) => (
-              <View key={key} style={styles.formGroup}>
-                <View style={styles.formLabelRow}>
-                  <Ionicons name={icon as any} size={16} color={COLORS.textSecondary} />
-                  <Text style={styles.formLabel}>{label}</Text>
-                </View>
+              { key: 'name', label: 'Pharmacy Name', placeholder: 'e.g., Shoppers Drug Mart' },
+              { key: 'address', label: 'Address', placeholder: 'Street address' },
+              { key: 'phone', label: 'Phone', placeholder: 'Phone number' },
+              { key: 'fax', label: 'Fax', placeholder: 'Fax number' },
+              { key: 'website', label: 'Website', placeholder: 'https://' },
+            ].map(field => (
+              <View key={field.key} style={styles.formGroup}>
+                <Text style={styles.formLabel}>{field.label}</Text>
                 <TextInput
                   style={styles.formInput}
-                  placeholder={placeholder}
-                  placeholderTextColor={COLORS.border}
-                  value={(pharmacyInfo as any)[key] || ''}
-                  onChangeText={(v) => setPharmacyInfo({ ...pharmacyInfo, [key]: v })}
-                  keyboardType={(kb as any) || 'default'}
+                  placeholder={field.placeholder}
+                  placeholderTextColor={COLORS.textMuted}
+                  value={(pharmacyInfo as any)[field.key] || ''}
+                  onChangeText={v => setPharmacyInfo({ ...pharmacyInfo, [field.key]: v })}
                 />
               </View>
             ))}
@@ -275,155 +305,295 @@ export default function MedicationsTab() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.sm },
-  headerTitle: { fontSize: FONT_SIZES.xxl, fontWeight: '800', color: COLORS.textPrimary },
-  addBtn: { 
-    width: 44, 
-    height: 44, 
-    borderRadius: 22, 
-    backgroundColor: COLORS.primary, 
-    justifyContent: 'center', 
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    padding: SPACING.xl,
+  },
+  scrollContent: {
+    paddingHorizontal: SPACING.lg,
+  },
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.lg,
+  },
+  headerTitle: {
+    fontSize: FONT_SIZES.xxl,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  headerSubtitle: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  addButton: {
+    width: 48,
+    height: 48,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    // Shadow for button
     shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 4,
   },
-  aiCheckerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.sm,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    backgroundColor: COLORS.secondary + '15',
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.secondary + '30',
-  },
-  aiCheckerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  aiCheckerText: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-    color: COLORS.secondary,
-  },
-  
-  // Pharmacy card styles
+
+  // Pharmacy Card
   pharmacyCard: {
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
-    padding: SPACING.md,
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.info + '30',
+    borderRadius: RADIUS.xl,
+    padding: SPACING.lg,
+    marginBottom: SPACING.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   pharmacyHeader: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   pharmacyIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: COLORS.info + '15',
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.secondaryLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING.sm,
   },
-  pharmacyHeaderText: {
+  pharmacyInfo: {
     flex: 1,
+    marginLeft: SPACING.md,
   },
-  pharmacyTitle: {
+  pharmacyLabel: {
     fontSize: FONT_SIZES.xs,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
+    color: COLORS.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   pharmacyName: {
     fontSize: FONT_SIZES.md,
-    fontWeight: '700',
+    fontWeight: '600',
     color: COLORS.textPrimary,
+    marginTop: 2,
   },
-  pharmacyEmpty: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.border,
-    fontStyle: 'italic',
-  },
-  pharmacyActions: {
+  pharmacyAction: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  pharmacyEditBtn: {
-    padding: SPACING.xs,
-  },
-  pharmacyDetails: {
-    marginTop: SPACING.sm,
-    paddingTop: SPACING.sm,
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
   },
-  pharmacyDetailRow: {
+  pharmacyActionText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.success,
+    fontWeight: '600',
+    marginLeft: SPACING.sm,
+  },
+
+  // Medication Card
+  medCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  medHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.xs,
-    gap: SPACING.xs,
   },
-  pharmacyDetailText: {
+  medTimeIndicator: {
+    width: 4,
+    height: 44,
+    borderRadius: 2,
+    marginRight: SPACING.md,
+  },
+  medInfo: {
+    flex: 1,
+  },
+  medName: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  medDosage: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.primary,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  deleteButton: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.errorLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  medDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: SPACING.md,
+    gap: SPACING.md,
+  },
+  medDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.md,
+  },
+  medDetailText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.textSecondary,
-    flex: 1,
+    marginLeft: SPACING.xs,
   },
-  pharmacyTip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.info + '15',
+  medInstructions: {
+    marginTop: SPACING.md,
     padding: SPACING.md,
-    borderRadius: RADIUS.lg,
-    marginBottom: SPACING.lg,
-    gap: 8,
+    backgroundColor: COLORS.warningLight,
+    borderRadius: RADIUS.md,
   },
-  pharmacyTipText: {
-    flex: 1,
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.info,
-    fontWeight: '600',
+  medInstructionsText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.warning,
+    fontStyle: 'italic',
   },
-  formLabelRow: {
+  medDoctor: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: SPACING.xs,
+    marginTop: SPACING.md,
   },
-  
-  emptyState: { alignItems: 'center', paddingVertical: SPACING.xxl },
-  emptyTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary, marginTop: SPACING.md },
-  emptyText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: SPACING.xs },
-  medCard: { marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, padding: SPACING.md, backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, shadowColor: COLORS.cardShadow, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 1, shadowRadius: 4, elevation: 2 },
-  medHeader: { flexDirection: 'row', alignItems: 'center' },
-  medIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.primaryLight + '20', justifyContent: 'center', alignItems: 'center', marginRight: SPACING.sm },
-  medInfo: { flex: 1 },
-  medName: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary },
-  medDosage: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
-  medDetail: { flexDirection: 'row', alignItems: 'center', marginTop: SPACING.xs, marginLeft: 52 },
-  medDetailText: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginLeft: 4 },
-  modalContainer: { flex: 1, backgroundColor: COLORS.background },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  modalTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary },
-  cancelText: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary },
-  saveText: { fontSize: FONT_SIZES.md, color: COLORS.primary, fontWeight: '700' },
-  modalBody: { padding: SPACING.lg },
-  formGroup: { marginBottom: SPACING.md },
-  formLabel: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textPrimary, marginBottom: SPACING.xs },
-  formInput: { backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, paddingHorizontal: SPACING.md, height: 48, fontSize: FONT_SIZES.md, color: COLORS.textPrimary },
+  medDoctorText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textMuted,
+    marginLeft: SPACING.xs,
+  },
+
+  // Empty State
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: SPACING.xxxl,
+  },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.lg,
+  },
+  emptyTitle: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  emptyText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
+  },
+
+  // Modal
+  modalContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  modalTitle: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  modalCancel: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+  },
+  modalSave: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  modalBody: {
+    flex: 1,
+    padding: SPACING.lg,
+  },
+
+  // Form
+  formGroup: {
+    marginBottom: SPACING.lg,
+  },
+  formLabel: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.sm,
+  },
+  formInput: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textPrimary,
+  },
+  formTextarea: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+
+  // Time Chips
+  timeChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+    marginTop: SPACING.sm,
+  },
+  timeChip: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+  },
+  timeChipText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
 });

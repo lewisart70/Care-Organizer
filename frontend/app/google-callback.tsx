@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
@@ -9,32 +9,31 @@ export default function GoogleCallbackScreen() {
   const router = useRouter();
   const hasProcessed = useRef(false);
 
+  const processCallback = useCallback(async () => {
+    try {
+      if (typeof window === 'undefined') return;
+      const hash = window.location.hash;
+      const sessionIdMatch = hash.match(/session_id=([^&]+)/);
+      if (sessionIdMatch) {
+        const sessionId = sessionIdMatch[1];
+        await loginWithGoogle(sessionId);
+        // Clean the URL hash
+        window.history.replaceState(null, '', window.location.pathname);
+        router.replace('/(tabs)/home');
+      } else {
+        router.replace('/');
+      }
+    } catch (error) {
+      console.error('Google auth callback error:', error);
+      router.replace('/');
+    }
+  }, [loginWithGoogle, router]);
+
   useEffect(() => {
     if (hasProcessed.current) return;
     hasProcessed.current = true;
-
-    const processCallback = async () => {
-      try {
-        if (typeof window === 'undefined') return;
-        const hash = window.location.hash;
-        const sessionIdMatch = hash.match(/session_id=([^&]+)/);
-        if (sessionIdMatch) {
-          const sessionId = sessionIdMatch[1];
-          await loginWithGoogle(sessionId);
-          // Clean the URL hash
-          window.history.replaceState(null, '', window.location.pathname);
-          router.replace('/(tabs)/home');
-        } else {
-          router.replace('/');
-        }
-      } catch (error) {
-        console.error('Google auth callback error:', error);
-        router.replace('/');
-      }
-    };
-
     processCallback();
-  }, []);
+  }, [processCallback]);
 
   return (
     <View style={styles.container}>

@@ -1,6 +1,28 @@
+import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../src/constants/theme';
+
+// Pre-defined icon components to avoid recreating on each render
+const HomeIcon = ({ color, size }: { color: string; size: number }) => (
+  <Ionicons name="home" size={size} color={color} />
+);
+
+const ProfileIcon = ({ color, size }: { color: string; size: number }) => (
+  <Ionicons name="person" size={size} color={color} />
+);
+
+const MedsIcon = ({ color, size }: { color: string; size: number }) => (
+  <Ionicons name="medkit" size={size} color={color} />
+);
+
+const NotesIcon = ({ color, size }: { color: string; size: number }) => (
+  <Ionicons name="document-text" size={size} color={color} />
+);
+
+const MoreIcon = ({ color, size }: { color: string; size: number }) => (
+  <Ionicons name="grid" size={size} color={color} />
+);
 
 export default function TabLayout() {
   return (
@@ -27,45 +49,35 @@ export default function TabLayout() {
         name="home"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
-          ),
+          tabBarIcon: HomeIcon,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
-          ),
+          tabBarIcon: ProfileIcon,
         }}
       />
       <Tabs.Screen
         name="medications-tab"
         options={{
           title: 'Meds',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="medkit" size={size} color={color} />
-          ),
+          tabBarIcon: MedsIcon,
         }}
       />
       <Tabs.Screen
         name="notes-tab"
         options={{
           title: 'Notes',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="document-text" size={size} color={color} />
-          ),
+          tabBarIcon: NotesIcon,
         }}
       />
       <Tabs.Screen
         name="more"
         options={{
           title: 'More',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="grid" size={size} color={color} />
-          ),
+          tabBarIcon: MoreIcon,
         }}
       />
     </Tabs>
