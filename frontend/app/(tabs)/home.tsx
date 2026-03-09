@@ -9,7 +9,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/utils/api';
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../../src/constants/theme';
-import { LogoSimple } from '../../src/components/Logo';
 
 export default function HomeScreen() {
   const { user, logout, selectedRecipientId, setSelectedRecipientId } = useAuth();
@@ -18,8 +17,6 @@ export default function HomeScreen() {
   const [dashboard, setDashboard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [reminders, setReminders] = useState<any[]>([]);
-  const [loadingReminders, setLoadingReminders] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -41,32 +38,45 @@ export default function HomeScreen() {
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
-  const loadReminders = async () => {
-    if (!selectedRecipientId) return;
-    setLoadingReminders(true);
-    try {
-      const res = await api.post('/ai/smart-reminders', { recipient_id: selectedRecipientId });
-      setReminders(res.reminders || []);
-    } catch {
-      setReminders([]);
-    } finally {
-      setLoadingReminders(false);
-    }
-  };
-
   const onRefresh = () => { setRefreshing(true); loadData(); };
 
-  const quickActions = [
-    { icon: 'medkit', color: COLORS.primary, route: '/medications' },
-    { icon: 'call', color: COLORS.error, route: '/emergency-contacts' },
-    { icon: 'calendar', color: COLORS.secondary, route: '/appointments' },
-    { icon: 'document-text', color: COLORS.info, route: '/(tabs)/notes-tab' },
-  ];
+  const activeRecipient = recipients.find(r => r.recipient_id === selectedRecipientId);
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.centered}><ActivityIndicator size="large" color={COLORS.primary} /></View>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // No recipients - onboarding state
+  if (recipients.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greeting}>Welcome back,</Text>
+            <Text style={styles.userName}>{user?.name?.split(' ')[0]}</Text>
+          </View>
+          <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
+            <Ionicons name="log-out-outline" size={24} color={COLORS.textSecondary} />
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIcon}>
+            <Ionicons name="people-outline" size={48} color={COLORS.primary} />
+          </View>
+          <Text style={styles.emptyTitle}>No care recipients yet</Text>
+          <Text style={styles.emptyText}>Add someone you're caring for to get started</Text>
+          <TouchableOpacity style={styles.addButton} onPress={() => router.push('/add-recipient')}>
+            <Ionicons name="add" size={20} color={COLORS.white} />
+            <Text style={styles.addButtonText}>Add Care Recipient</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
@@ -76,479 +86,561 @@ export default function HomeScreen() {
       <ScrollView
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0]}</Text>
-            <Text style={styles.subGreeting}>Here's today's care overview</Text>
+            <Text style={styles.greeting}>Good {getTimeOfDay()},</Text>
+            <Text style={styles.userName}>{user?.name?.split(' ')[0]}</Text>
           </View>
-          <TouchableOpacity testID="logout-btn" style={styles.logoutBtn} onPress={logout}>
-            <Ionicons name="log-out-outline" size={22} color={COLORS.textSecondary} />
+          <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
+            <Ionicons name="log-out-outline" size={24} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
 
-        {/* No recipients */}
-        {recipients.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <LogoSimple size={64} />
-            <Text style={styles.emptyTitle}>Welcome to FamilyCare!</Text>
-            <Text style={styles.emptyText}>Start by adding a care recipient — the person you're caring for.</Text>
-            <TouchableOpacity
-              testID="add-first-recipient-btn"
-              style={styles.addBtn}
-              onPress={() => router.push('/add-recipient')}
-            >
-              <Ionicons name="add" size={20} color={COLORS.white} />
-              <Text style={styles.addBtnText}>Add Care Recipient</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            {/* Recipient selector with profile photos */}
-            {recipients.length > 1 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recipientScroll}>
-                {recipients.map((r: any) => (
-                  <TouchableOpacity
-                    key={r.recipient_id}
-                    testID={`recipient-${r.recipient_id}`}
-                    style={[styles.recipientChipWithPhoto, selectedRecipientId === r.recipient_id && styles.recipientChipActive]}
-                    onPress={async () => {
-                      if (selectedRecipientId === r.recipient_id) {
-                        // If already selected, go to profile
-                        router.push('/edit-profile');
-                      } else {
-                        // Otherwise, select this recipient
-                        setSelectedRecipientId(r.recipient_id);
-                        const dash = await api.get(`/dashboard/${r.recipient_id}`);
-                        setDashboard(dash);
-                      }
-                    }}
-                    onLongPress={() => {
-                      // Long press always goes to profile
-                      setSelectedRecipientId(r.recipient_id);
-                      router.push('/edit-profile');
-                    }}
-                  >
-                    {r.profile_photo ? (
-                      <Image source={{ uri: r.profile_photo }} style={styles.recipientThumb} />
-                    ) : (
-                      <View style={styles.recipientThumbPlaceholder}>
-                        <Ionicons name="person" size={16} color={COLORS.textSecondary} />
-                      </View>
-                    )}
-                    <Text style={[styles.recipientChipText, selectedRecipientId === r.recipient_id && styles.recipientChipTextActive]}>
-                      {r.name.split(' ')[0]}
-                    </Text>
-                    {selectedRecipientId === r.recipient_id && (
-                      <Ionicons name="chevron-forward" size={14} color={COLORS.primary} />
-                    )}
-                  </TouchableOpacity>
-                ))}
-                <TouchableOpacity
-                  testID="add-recipient-chip"
-                  style={styles.addRecipientChip}
-                  onPress={() => router.push('/add-recipient')}
-                >
-                  <Ionicons name="add" size={18} color={COLORS.primary} />
-                </TouchableOpacity>
-              </ScrollView>
-            )}
-
-            {/* Single Recipient Card with Photo (when only one recipient) */}
-            {recipients.length === 1 && (
-              <TouchableOpacity 
-                style={styles.singleRecipientCard}
-                onPress={() => router.push('/edit-profile')}
-                activeOpacity={0.7}
-              >
-                <View style={styles.recipientPhotoLarge}>
-                  {recipients[0].profile_photo ? (
-                    <Image source={{ uri: recipients[0].profile_photo }} style={styles.recipientPhotoLargeImg} />
-                  ) : (
-                    <View style={styles.recipientPhotoLargePlaceholder}>
-                      <Ionicons name="person" size={32} color={COLORS.textSecondary} />
-                    </View>
-                  )}
-                </View>
-                <View style={styles.singleRecipientInfo}>
-                  <Text style={styles.singleRecipientName}>{recipients[0].name}</Text>
-                  {recipients[0].date_of_birth && (
-                    <Text style={styles.singleRecipientDob}>DOB: {recipients[0].date_of_birth}</Text>
-                  )}
-                  <Text style={styles.tapToEditHint}>Tap to view profile</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
-              </TouchableOpacity>
-            )}
-            
-            {/* Add Another Recipient Button (when single recipient) */}
-            {recipients.length === 1 && (
+        {/* Care Recipient Selector */}
+        {recipients.length > 1 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recipientScroll}>
+            {recipients.map(r => (
               <TouchableOpacity
-                testID="add-another-recipient"
-                style={styles.addAnotherBtnStandalone}
-                onPress={() => router.push('/add-recipient')}
+                key={r.recipient_id}
+                style={[styles.recipientChip, selectedRecipientId === r.recipient_id && styles.recipientChipActive]}
+                onPress={() => { setSelectedRecipientId(r.recipient_id); loadData(); }}
               >
-                <Ionicons name="person-add" size={16} color={COLORS.primary} />
-                <Text style={styles.addAnotherText}>Add Another Care Recipient</Text>
+                <View style={[styles.recipientAvatar, selectedRecipientId === r.recipient_id && styles.recipientAvatarActive]}>
+                  <Text style={styles.recipientInitial}>{r.name?.charAt(0)}</Text>
+                </View>
+                <Text style={[styles.recipientName, selectedRecipientId === r.recipient_id && styles.recipientNameActive]}>
+                  {r.name?.split(' ')[0]}
+                </Text>
               </TouchableOpacity>
-            )}
+            ))}
+            <TouchableOpacity style={styles.addRecipientChip} onPress={() => router.push('/add-recipient')}>
+              <Ionicons name="add" size={20} color={COLORS.primary} />
+            </TouchableOpacity>
+          </ScrollView>
+        )}
 
-            {/* Stats Cards */}
-            {dashboard && (
-              <View style={styles.statsGrid}>
-                <View style={[styles.statCard, { backgroundColor: '#FFF5F0' }]}>
-                  <Ionicons name="medkit" size={24} color={COLORS.primary} />
-                  <Text style={styles.statNum}>{dashboard.stats.medications}</Text>
-                  <Text style={styles.statLabel}>Medications</Text>
-                </View>
-                <View style={[styles.statCard, { backgroundColor: '#F0F7F4' }]}>
-                  <Ionicons name="calendar" size={24} color={COLORS.secondary} />
-                  <Text style={styles.statNum}>{dashboard.stats.appointments}</Text>
-                  <Text style={styles.statLabel}>Appointments</Text>
-                </View>
-                <View style={[styles.statCard, { backgroundColor: '#FFF9EB' }]}>
-                  <Ionicons name="document-text" size={24} color={COLORS.warning} />
-                  <Text style={styles.statNum}>{dashboard.stats.notes}</Text>
-                  <Text style={styles.statLabel}>Notes</Text>
-                </View>
-                <View style={[styles.statCard, { backgroundColor: '#F0F4FF' }]}>
-                  <Ionicons name="people" size={24} color={COLORS.info} />
-                  <Text style={styles.statNum}>{dashboard.stats.caregivers}</Text>
-                  <Text style={styles.statLabel}>Caregivers</Text>
-                </View>
-              </View>
-            )}
-
-            {/* Quick Actions */}
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <View style={styles.actionsRow}>
-              {quickActions.map((a, index) => (
-                <TouchableOpacity
-                  key={index}
-                  testID={`quick-action-${index}`}
-                  style={styles.actionBtn}
-                  onPress={() => router.push(a.route as any)}
-                >
-                  <View style={[styles.actionIcon, { backgroundColor: a.color + '15' }]}>
-                    <Ionicons name={a.icon as any} size={24} color={a.color} />
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* AI Smart Reminders */}
-            <View style={styles.reminderSection}>
-              <View style={styles.reminderHeader}>
-                <Text style={styles.sectionTitle}>Smart Reminders</Text>
-                <TouchableOpacity testID="refresh-reminders-btn" onPress={loadReminders} style={styles.aiBtn}>
-                  <Ionicons name="sparkles" size={16} color={COLORS.white} />
-                  <Text style={styles.aiBtnText}>Generate</Text>
-                </TouchableOpacity>
-              </View>
-              {loadingReminders ? (
-                <ActivityIndicator color={COLORS.primary} style={{ marginVertical: SPACING.lg }} />
-              ) : reminders.length > 0 ? (
-                reminders.slice(0, 4).map((r: any, i: number) => (
-                  <View key={i} style={styles.reminderCard}>
-                    <View style={[styles.reminderDot, {
-                      backgroundColor: r.priority === 'high' ? COLORS.error : r.priority === 'medium' ? COLORS.warning : COLORS.success
-                    }]} />
-                    <View style={styles.reminderContent}>
-                      <Text style={styles.reminderTitle}>{r.title}</Text>
-                      <Text style={styles.reminderDesc}>{r.description}</Text>
-                    </View>
-                  </View>
-                ))
+        {/* Active Recipient Card */}
+        {activeRecipient && (
+          <TouchableOpacity style={styles.profileCard} onPress={() => router.push('/(tabs)/profile')}>
+            <View style={styles.profileHeader}>
+              {activeRecipient.profile_picture ? (
+                <Image source={{ uri: activeRecipient.profile_picture }} style={styles.profileImage} />
               ) : (
-                <View style={styles.reminderEmpty}>
-                  <Ionicons name="sparkles" size={24} color={COLORS.primaryLight} />
-                  <Text style={styles.reminderEmptyText}>Tap "Generate" for AI-powered care reminders</Text>
+                <View style={styles.profileAvatar}>
+                  <Text style={styles.profileInitial}>{activeRecipient.name?.charAt(0)}</Text>
+                </View>
+              )}
+              <View style={styles.profileInfo}>
+                <Text style={styles.profileName}>{activeRecipient.name}</Text>
+                {activeRecipient.date_of_birth && (
+                  <Text style={styles.profileAge}>
+                    {calculateAge(activeRecipient.date_of_birth)} years old
+                  </Text>
+                )}
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
+            </View>
+            {activeRecipient.notes && (
+              <Text style={styles.profileNotes} numberOfLines={2}>{activeRecipient.notes}</Text>
+            )}
+          </TouchableOpacity>
+        )}
+
+        {/* Quick Actions - Apple Health Style Grid */}
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <View style={styles.quickActionsGrid}>
+          <TouchableOpacity style={[styles.quickAction, { backgroundColor: COLORS.primaryLight }]} onPress={() => router.push('/(tabs)/medications-tab')}>
+            <View style={[styles.quickActionIcon, { backgroundColor: COLORS.primary }]}>
+              <Ionicons name="medical" size={22} color={COLORS.white} />
+            </View>
+            <Text style={styles.quickActionLabel}>Medications</Text>
+            <Text style={styles.quickActionCount}>{dashboard?.stats?.medications || 0} active</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.quickAction, { backgroundColor: COLORS.secondaryLight }]} onPress={() => router.push('/(tabs)/appointments-tab')}>
+            <View style={[styles.quickActionIcon, { backgroundColor: COLORS.secondary }]}>
+              <Ionicons name="calendar" size={22} color={COLORS.white} />
+            </View>
+            <Text style={styles.quickActionLabel}>Appointments</Text>
+            <Text style={styles.quickActionCount}>{dashboard?.upcoming_appointments?.length || 0} upcoming</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.quickAction, { backgroundColor: COLORS.infoLight }]} onPress={() => router.push('/(tabs)/notes-tab')}>
+            <View style={[styles.quickActionIcon, { backgroundColor: COLORS.info }]}>
+              <Ionicons name="document-text" size={22} color={COLORS.white} />
+            </View>
+            <Text style={styles.quickActionLabel}>Notes</Text>
+            <Text style={styles.quickActionCount}>{dashboard?.stats?.notes || 0} total</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.quickAction, { backgroundColor: COLORS.errorLight }]} onPress={() => router.push('/emergency-contacts')}>
+            <View style={[styles.quickActionIcon, { backgroundColor: COLORS.error }]}>
+              <Ionicons name="call" size={22} color={COLORS.white} />
+            </View>
+            <Text style={styles.quickActionLabel}>Emergency</Text>
+            <Text style={styles.quickActionCount}>Contacts</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Health Summary Cards - MyChart Style */}
+        <Text style={styles.sectionTitle}>Health Summary</Text>
+        
+        {/* Upcoming Appointment Card */}
+        {dashboard?.upcoming_appointments?.length > 0 ? (
+          <TouchableOpacity style={styles.summaryCard} onPress={() => router.push('/(tabs)/appointments-tab')}>
+            <View style={styles.summaryHeader}>
+              <View style={[styles.summaryIcon, { backgroundColor: COLORS.secondaryLight }]}>
+                <Ionicons name="calendar" size={20} color={COLORS.secondary} />
+              </View>
+              <View style={styles.summaryTitleContainer}>
+                <Text style={styles.summaryTitle}>Next Appointment</Text>
+                <Text style={styles.summarySubtitle}>{dashboard.upcoming_appointments[0].title}</Text>
+              </View>
+            </View>
+            <View style={styles.summaryContent}>
+              <View style={styles.summaryRow}>
+                <Ionicons name="time-outline" size={16} color={COLORS.textSecondary} />
+                <Text style={styles.summaryText}>
+                  {formatDate(dashboard.upcoming_appointments[0].date)} at {dashboard.upcoming_appointments[0].time || 'TBD'}
+                </Text>
+              </View>
+              {dashboard.upcoming_appointments[0].location && (
+                <View style={styles.summaryRow}>
+                  <Ionicons name="location-outline" size={16} color={COLORS.textSecondary} />
+                  <Text style={styles.summaryText}>{dashboard.upcoming_appointments[0].location}</Text>
                 </View>
               )}
             </View>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.noDataCard}>
+            <Ionicons name="calendar-outline" size={24} color={COLORS.textMuted} />
+            <Text style={styles.noDataText}>No upcoming appointments</Text>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/appointments-tab')}>
+              <Text style={styles.noDataLink}>Schedule one</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-            {/* Upcoming Appointments */}
-            {dashboard?.upcoming_appointments?.length > 0 && (
-              <View>
-                <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
-                {dashboard.upcoming_appointments.map((a: any) => (
-                  <View key={a.appointment_id} style={styles.apptCard}>
-                    <View style={styles.apptDate}>
-                      <Ionicons name="calendar-outline" size={18} color={COLORS.primary} />
-                      <Text style={styles.apptDateText}>{a.date}</Text>
-                    </View>
-                    <Text style={styles.apptTitle}>{a.title}</Text>
-                    {a.doctor_name ? <Text style={styles.apptDoctor}>Dr. {a.doctor_name}</Text> : null}
-                  </View>
-                ))}
-              </View>
-            )}
+        {/* Medications Card */}
+        <TouchableOpacity style={styles.summaryCard} onPress={() => router.push('/(tabs)/medications-tab')}>
+          <View style={styles.summaryHeader}>
+            <View style={[styles.summaryIcon, { backgroundColor: COLORS.primaryLight }]}>
+              <Ionicons name="medical" size={20} color={COLORS.primary} />
+            </View>
+            <View style={styles.summaryTitleContainer}>
+              <Text style={styles.summaryTitle}>Medications</Text>
+              <Text style={styles.summarySubtitle}>{dashboard?.stats?.medications || 0} active medications</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
+          </View>
+        </TouchableOpacity>
 
-            {/* Recent Notes */}
-            {dashboard?.recent_notes?.length > 0 && (
-              <View style={{ marginBottom: SPACING.xl }}>
-                <Text style={styles.sectionTitle}>Recent Notes</Text>
-                {dashboard.recent_notes.map((n: any) => (
-                  <View key={n.note_id} style={styles.noteCard}>
-                    <Text style={styles.noteContent} numberOfLines={2}>{n.content}</Text>
-                    <Text style={styles.noteAuthor}>— {n.author_name}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
+        {/* Doctors Card */}
+        <TouchableOpacity style={styles.summaryCard} onPress={() => router.push('/doctors')}>
+          <View style={styles.summaryHeader}>
+            <View style={[styles.summaryIcon, { backgroundColor: COLORS.infoLight }]}>
+              <Ionicons name="person" size={20} color={COLORS.info} />
+            </View>
+            <View style={styles.summaryTitleContainer}>
+              <Text style={styles.summaryTitle}>Care Team</Text>
+              <Text style={styles.summarySubtitle}>Doctors & specialists</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
+          </View>
+        </TouchableOpacity>
 
-            {/* Book Promotion Banner */}
-            <TouchableOpacity 
-              style={styles.bookBanner}
-              onPress={() => router.push('/about-book')}
-            >
-              <Image 
-                source={require('../../assets/images/book-cover.png')}
-                style={styles.bookBannerImage}
-                resizeMode="cover"
-              />
-              <View style={styles.bookBannerContent}>
-                <Text style={styles.bookBannerLabel}>COMPANION BOOK</Text>
-                <Text style={styles.bookBannerTitle}>The Family Care Organizer</Text>
-                <Text style={styles.bookBannerAuthor}>by Sarah Lewis</Text>
-                <View style={styles.bookBannerCta}>
-                  <Text style={styles.bookBannerCtaText}>Learn More</Text>
-                  <Ionicons name="arrow-forward" size={14} color={COLORS.primary} />
-                </View>
+        {/* Recent Activity */}
+        {dashboard?.recent_notes?.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <TouchableOpacity style={styles.activityCard} onPress={() => router.push('/(tabs)/notes-tab')}>
+              <View style={styles.activityIcon}>
+                <Ionicons name="document-text" size={18} color={COLORS.info} />
               </View>
+              <View style={styles.activityContent}>
+                <Text style={styles.activityText}>{dashboard.recent_notes.length} recent notes</Text>
+                <Text style={styles.activityTime}>Tap to view all notes</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
             </TouchableOpacity>
           </>
         )}
+
+        <View style={{ height: SPACING.xxxl }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+// Helper functions
+function getTimeOfDay() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'morning';
+  if (hour < 17) return 'afternoon';
+  return 'evening';
+}
+
+function calculateAge(dateOfBirth: string) {
+  const today = new Date();
+  const birth = new Date(dateOfBirth);
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+}
+
+function formatDate(dateStr: string) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.md,
-  },
-  greeting: { fontSize: FONT_SIZES.xxl, fontWeight: '800', color: COLORS.textPrimary },
-  subGreeting: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
-  logoutBtn: { padding: SPACING.sm },
-  emptyCard: {
-    margin: SPACING.lg, padding: SPACING.xl, backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.xl, alignItems: 'center',
-    shadowColor: COLORS.cardShadow, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1, shadowRadius: 8, elevation: 3,
-  },
-  emptyIconCircle: {
-    width: 72, height: 72, borderRadius: 36, backgroundColor: COLORS.primaryLight + '30',
-    justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.md,
-  },
-  emptyTitle: { fontSize: FONT_SIZES.xl, fontWeight: '700', color: COLORS.textPrimary, marginBottom: SPACING.sm },
-  emptyText: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary, textAlign: 'center', lineHeight: 22 },
-  addBtn: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.full, paddingVertical: SPACING.md, paddingHorizontal: SPACING.lg,
-    marginTop: SPACING.lg,
-  },
-  addBtnText: { color: COLORS.white, fontSize: FONT_SIZES.md, fontWeight: '700', marginLeft: SPACING.sm },
-  recipientScroll: { paddingHorizontal: SPACING.lg, marginBottom: SPACING.md },
-  recipientChip: {
-    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: RADIUS.full,
-    backgroundColor: COLORS.surface, borderWidth: 1.5, borderColor: COLORS.border, marginRight: SPACING.sm,
-  },
-  recipientChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  recipientChipText: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textSecondary },
-  recipientChipTextActive: { color: COLORS.white },
-  addRecipientChip: {
-    width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: COLORS.primary,
-    borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center',
-  },
-  statsGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: SPACING.lg,
-    justifyContent: 'space-between', marginBottom: SPACING.md,
-  },
-  statCard: {
-    width: '48%', padding: SPACING.md, borderRadius: RADIUS.lg,
-    marginBottom: SPACING.sm, alignItems: 'center',
-  },
-  statNum: { fontSize: FONT_SIZES.xxl, fontWeight: '800', color: COLORS.textPrimary, marginTop: SPACING.xs },
-  statLabel: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2 },
-  sectionTitle: {
-    fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary,
-    paddingHorizontal: SPACING.lg, marginTop: SPACING.md, marginBottom: SPACING.sm,
-  },
-  actionsRow: {
-    flexDirection: 'row', paddingHorizontal: SPACING.md,
-    justifyContent: 'space-between', marginBottom: SPACING.md,
-  },
-  actionBtn: { alignItems: 'center', width: '24%' },
-  actionIcon: {
-    width: 52, height: 52, borderRadius: RADIUS.lg,
-    justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.xs,
-  },
-  actionLabel: { fontSize: 10, fontWeight: '600', color: COLORS.textSecondary, textAlign: 'center' },
-  reminderSection: { paddingHorizontal: SPACING.lg, marginBottom: SPACING.md },
-  reminderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  aiBtn: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.secondary,
-    borderRadius: RADIUS.full, paddingVertical: SPACING.xs, paddingHorizontal: SPACING.md,
-  },
-  aiBtnText: { color: COLORS.white, fontSize: FONT_SIZES.xs, fontWeight: '700', marginLeft: 4 },
-  reminderCard: {
-    flexDirection: 'row', backgroundColor: COLORS.surface, borderRadius: RADIUS.lg,
-    padding: SPACING.md, marginTop: SPACING.sm, alignItems: 'flex-start',
-    shadowColor: COLORS.cardShadow, shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 1, shadowRadius: 4, elevation: 2,
-  },
-  reminderDot: { width: 8, height: 8, borderRadius: 4, marginTop: 6, marginRight: SPACING.sm },
-  reminderContent: { flex: 1 },
-  reminderTitle: { fontSize: FONT_SIZES.sm, fontWeight: '700', color: COLORS.textPrimary },
-  reminderDesc: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2, lineHeight: 18 },
-  reminderEmpty: {
-    alignItems: 'center', paddingVertical: SPACING.lg,
-    backgroundColor: COLORS.primaryLight + '10', borderRadius: RADIUS.lg, marginTop: SPACING.sm,
-  },
-  reminderEmptyText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: SPACING.sm },
-  apptCard: {
-    marginHorizontal: SPACING.lg, padding: SPACING.md, backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg, marginBottom: SPACING.sm, borderLeftWidth: 3, borderLeftColor: COLORS.primary,
-  },
-  apptDate: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  apptDateText: { fontSize: FONT_SIZES.xs, color: COLORS.primary, fontWeight: '600', marginLeft: 4 },
-  apptTitle: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary },
-  apptDoctor: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
-  noteCard: {
-    marginHorizontal: SPACING.lg, padding: SPACING.md, backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg, marginBottom: SPACING.sm,
-  },
-  noteContent: { fontSize: FONT_SIZES.sm, color: COLORS.textPrimary, lineHeight: 20 },
-  noteAuthor: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 4, fontStyle: 'italic' },
-  
-  // Profile photo styles for recipient selector
-  recipientChipWithPhoto: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs, borderRadius: RADIUS.full,
-    backgroundColor: COLORS.surface, borderWidth: 1.5, borderColor: COLORS.border, marginRight: SPACING.sm,
-  },
-  recipientThumb: {
-    width: 28, height: 28, borderRadius: 14,
-  },
-  recipientThumbPlaceholder: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: COLORS.primaryLight + '30',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  
-  // Single recipient card with large photo
-  singleRecipientCard: {
-    flexDirection: 'row', alignItems: 'center',
-    marginHorizontal: SPACING.lg, marginBottom: SPACING.md,
-    padding: SPACING.md, backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.xl,
-    shadowColor: COLORS.cardShadow, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1, shadowRadius: 6, elevation: 3,
-  },
-  recipientPhotoLarge: {
-    position: 'relative',
-  },
-  recipientPhotoLargeImg: {
-    width: 56, height: 56, borderRadius: 28,
-  },
-  recipientPhotoLargePlaceholder: {
-    width: 56, height: 56, borderRadius: 28,
-    backgroundColor: COLORS.primaryLight + '30',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  editBadgeSmall: {
-    position: 'absolute', bottom: 0, right: 0,
-    width: 20, height: 20, borderRadius: 10,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2, borderColor: COLORS.surface,
-  },
-  singleRecipientInfo: {
-    flex: 1, marginLeft: SPACING.md,
-  },
-  singleRecipientName: {
-    fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary,
-  },
-  singleRecipientDob: {
-    fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2,
-  },
-  tapToEditHint: {
-    fontSize: FONT_SIZES.xs, color: COLORS.primary, marginTop: 4, fontStyle: 'italic',
-  },
-  addAnotherBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.full, borderWidth: 1, borderColor: COLORS.primary,
-  },
-  addAnotherBtnStandalone: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    marginHorizontal: SPACING.lg, marginTop: SPACING.sm, marginBottom: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.primary,
-    borderStyle: 'dashed',
-  },
-  addAnotherText: {
-    fontSize: FONT_SIZES.xs, fontWeight: '600', color: COLORS.primary,
-  },
-  
-  // Book promotion banner styles
-  bookBanner: {
-    flexDirection: 'row',
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.xl,
-    padding: SPACING.md,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.xl,
-    shadowColor: COLORS.cardShadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: COLORS.primary + '20',
-  },
-  bookBannerImage: {
-    width: 70,
-    height: 90,
-    borderRadius: RADIUS.md,
-  },
-  bookBannerContent: {
+  container: {
     flex: 1,
-    marginLeft: SPACING.md,
+    backgroundColor: COLORS.background,
+  },
+  centered: {
+    flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  bookBannerLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.primary,
-    letterSpacing: 1,
-    marginBottom: 2,
+  scrollContent: {
+    paddingBottom: SPACING.xl,
   },
-  bookBannerTitle: {
-    fontSize: FONT_SIZES.sm,
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.md,
+  },
+  greeting: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+  },
+  userName: {
+    fontSize: FONT_SIZES.xxl,
     fontWeight: '700',
     color: COLORS.textPrimary,
-    lineHeight: 18,
   },
-  bookBannerAuthor: {
+  logoutBtn: {
+    padding: SPACING.sm,
+  },
+
+  // Recipient Selector
+  recipientScroll: {
+    paddingHorizontal: SPACING.xl,
+    marginBottom: SPACING.lg,
+  },
+  recipientChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.full,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    marginRight: SPACING.sm,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+  },
+  recipientChipActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryLight,
+  },
+  recipientAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING.sm,
+  },
+  recipientAvatarActive: {
+    backgroundColor: COLORS.primary,
+  },
+  recipientInitial: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  recipientName: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  recipientNameActive: {
+    color: COLORS.primary,
+  },
+  addRecipientChip: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Profile Card
+  profileCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.lg,
+    marginHorizontal: SPACING.xl,
+    marginBottom: SPACING.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  profileImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  profileAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileInitial: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  profileInfo: {
+    flex: 1,
+    marginLeft: SPACING.lg,
+  },
+  profileName: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  profileAge: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  profileNotes: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.md,
+    lineHeight: 20,
+  },
+
+  // Section Title
+  sectionTitle: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginHorizontal: SPACING.xl,
+    marginBottom: SPACING.md,
+    marginTop: SPACING.md,
+  },
+
+  // Quick Actions Grid
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: SPACING.xl,
+    gap: SPACING.md,
+  },
+  quickAction: {
+    width: '47%',
+    borderRadius: RADIUS.xl,
+    padding: SPACING.lg,
+  },
+  quickActionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  quickActionLabel: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  quickActionCount: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+
+  // Summary Cards
+  summaryCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.lg,
+    marginHorizontal: SPACING.xl,
+    marginBottom: SPACING.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  summaryIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  summaryTitleContainer: {
+    flex: 1,
+    marginLeft: SPACING.md,
+  },
+  summaryTitle: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  summarySubtitle: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  summaryContent: {
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  summaryText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    marginLeft: SPACING.sm,
+  },
+
+  // No Data Card
+  noDataCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.lg,
+    marginHorizontal: SPACING.xl,
+    marginBottom: SPACING.md,
+  },
+  noDataText: {
+    flex: 1,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textMuted,
+    marginLeft: SPACING.md,
+  },
+  noDataLink: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+
+  // Activity Card
+  activityCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.lg,
+    marginHorizontal: SPACING.xl,
+    marginBottom: SPACING.md,
+  },
+  activityIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.infoLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  activityContent: {
+    flex: 1,
+    marginLeft: SPACING.md,
+  },
+  activityText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '500',
+    color: COLORS.textPrimary,
+  },
+  activityTime: {
     fontSize: FONT_SIZES.xs,
     color: COLORS.textSecondary,
     marginTop: 2,
   },
-  bookBannerCta: {
+
+  // Empty State
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+  },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.xl,
+  },
+  emptyTitle: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.sm,
+  },
+  emptyText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: SPACING.xl,
+  },
+  addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: SPACING.xs,
-    gap: 4,
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: RADIUS.full,
+    gap: SPACING.sm,
   },
-  bookBannerCtaText: {
-    fontSize: FONT_SIZES.xs,
+  addButtonText: {
+    fontSize: FONT_SIZES.md,
     fontWeight: '600',
-    color: COLORS.primary,
+    color: COLORS.white,
   },
 });
