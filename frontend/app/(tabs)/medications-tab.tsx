@@ -124,6 +124,21 @@ export default function MedicationsTab() {
           <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: SPACING.xxl }} />
         ) : (
           <>
+            {/* AI Drug Interaction Checker */}
+            <TouchableOpacity 
+              style={styles.interactionCard} 
+              onPress={() => router.push('/medication-checker')}
+            >
+              <View style={styles.interactionIcon}>
+                <Ionicons name="sparkles" size={22} color={COLORS.white} />
+              </View>
+              <View style={styles.interactionContent}>
+                <Text style={styles.interactionTitle}>Check Drug Interactions</Text>
+                <Text style={styles.interactionSubtitle}>AI-powered safety analysis</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
+            </TouchableOpacity>
+
             {/* Pharmacy Card */}
             <TouchableOpacity style={styles.pharmacyCard} onPress={() => setShowPharmacyModal(true)}>
               <View style={styles.pharmacyHeader}>
@@ -405,6 +420,50 @@ const styles = StyleSheet.create({
     color: COLORS.success,
     fontWeight: '600',
     marginLeft: SPACING.sm,
+  },
+
+  // AI Drug Interaction Card
+  interactionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary + '30',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  interactionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  interactionContent: {
+    flex: 1,
+    marginLeft: SPACING.md,
+  },
+  interactionTitle: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  interactionSubtitle: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
+    marginTop: 2,
   },
 
   // Medication Card
