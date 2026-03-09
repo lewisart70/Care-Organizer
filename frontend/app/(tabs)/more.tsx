@@ -3,17 +3,16 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../src/context/AuthContext';
 import { COLORS, SPACING, FONT_SIZES, RADIUS, SHADOWS } from '../../src/constants/theme';
 
 const menuItems = [
-  { icon: 'search-circle', label: 'Find Local Support', description: 'AI-powered resource finder', route: '/find-support', color: '#1ABC9C', gradient: ['#1ABC9C', '#16A085'] },
-  { icon: 'download', label: 'Export Report', description: 'Generate PDF care reports', route: '/export-report', color: '#8E44AD', gradient: ['#9B59B6', '#8E44AD'] },
-  { icon: 'medical', label: 'Doctors & Specialists', description: 'Manage care team', route: '/doctors', color: COLORS.primary, gradient: ['#D97757', '#C96B4B'] },
-  { icon: 'call', label: 'Emergency Contacts', description: 'Quick access contacts', route: '/emergency-contacts', color: COLORS.error, gradient: ['#E74C3C', '#C0392B'] },
-  { icon: 'shield-checkmark', label: 'Privacy & Data', description: 'Manage your data', route: '/privacy-settings', color: '#27AE60', gradient: ['#2ECC71', '#27AE60'] },
-  { icon: 'book', label: 'About the Book', description: 'The Family Care Organizer', route: '/about-book', color: '#D97757', gradient: ['#E8947A', '#D97757'] },
+  { icon: 'search-circle', label: 'Find Local Support', description: 'AI-powered resource finder', route: '/find-support', color: '#1ABC9C' },
+  { icon: 'download', label: 'Export Report', description: 'Generate PDF care reports', route: '/export-report', color: '#8E44AD' },
+  { icon: 'medical', label: 'Doctors & Specialists', description: 'Manage care team', route: '/doctors', color: COLORS.primary },
+  { icon: 'call', label: 'Emergency Contacts', description: 'Quick access contacts', route: '/emergency-contacts', color: COLORS.error },
+  { icon: 'shield-checkmark', label: 'Privacy & Data', description: 'Manage your data', route: '/privacy-settings', color: '#27AE60' },
+  { icon: 'book', label: 'About the Book', description: 'The Family Care Organizer', route: '/about-book', color: '#D97757' },
 ];
 
 export default function MoreScreen() {
@@ -29,22 +28,14 @@ export default function MoreScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Premium User Card with Gradient Border */}
+        {/* Premium User Card */}
         <View style={styles.userCardWrapper}>
-          <LinearGradient
-            colors={[COLORS.primary, COLORS.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.userCardGradient}
-          >
+          <View style={styles.userCardBorder}>
             <View style={styles.userCard}>
               <View style={styles.userAvatarWrapper}>
-                <LinearGradient
-                  colors={[COLORS.primary, COLORS.primaryDark]}
-                  style={styles.userAvatar}
-                >
+                <View style={styles.userAvatar}>
                   <Text style={styles.userAvatarText}>{user?.name?.charAt(0)?.toUpperCase()}</Text>
-                </LinearGradient>
+                </View>
               </View>
               <View style={styles.userInfo}>
                 <Text style={styles.userName}>{user?.name}</Text>
@@ -55,7 +46,7 @@ export default function MoreScreen() {
                 </View>
               </View>
             </View>
-          </LinearGradient>
+          </View>
         </View>
 
         {/* Section Label */}
@@ -75,12 +66,9 @@ export default function MoreScreen() {
               onPress={() => router.push(item.route as any)}
               activeOpacity={0.7}
             >
-              <LinearGradient
-                colors={item.gradient}
-                style={styles.menuIconGradient}
-              >
+              <View style={[styles.menuIconBox, { backgroundColor: item.color }]}>
                 <Ionicons name={item.icon as any} size={22} color={COLORS.white} />
-              </LinearGradient>
+              </View>
               <View style={styles.menuContent}>
                 <Text style={styles.menuLabel}>{item.label}</Text>
                 <Text style={styles.menuDescription}>{item.description}</Text>
@@ -140,9 +128,10 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.xl + 2,
     ...SHADOWS.lg,
   },
-  userCardGradient: {
+  userCardBorder: {
     padding: 2,
     borderRadius: RADIUS.xl + 2,
+    backgroundColor: COLORS.primary,
   },
   userCard: {
     flexDirection: 'row', 
@@ -160,6 +149,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center', 
     alignItems: 'center',
+    backgroundColor: COLORS.primary,
   },
   userAvatarText: { 
     fontSize: FONT_SIZES.xl, 
@@ -229,7 +219,7 @@ const styles = StyleSheet.create({
   menuItemLast: {
     borderBottomWidth: 0,
   },
-  menuIconGradient: {
+  menuIconBox: {
     width: 44, 
     height: 44, 
     borderRadius: RADIUS.md,

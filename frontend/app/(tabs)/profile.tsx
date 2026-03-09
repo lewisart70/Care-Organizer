@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/utils/api';
@@ -155,26 +154,21 @@ export default function ProfileScreen() {
 
         {/* Premium Profile Card */}
         <View style={styles.profileCardWrapper}>
-          <LinearGradient
-            colors={[COLORS.primary + '15', COLORS.secondary + '10']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.profileCardGradient}
-          >
+          <View style={styles.profileCardGradient}>
             <View style={styles.profileCard}>
               {/* Avatar with Camera Button */}
               <TouchableOpacity onPress={showPhotoOptions} style={styles.avatarContainer} disabled={uploadingPhoto} activeOpacity={0.8}>
                 <View style={styles.avatarWrapper}>
                   {uploadingPhoto ? (
-                    <LinearGradient colors={[COLORS.primary, COLORS.primaryDark]} style={styles.avatar}>
+                    <View style={[styles.avatar, { backgroundColor: COLORS.primary }]}>
                       <ActivityIndicator color={COLORS.white} />
-                    </LinearGradient>
+                    </View>
                   ) : recipient.profile_picture ? (
                     <Image source={{ uri: recipient.profile_picture }} style={styles.avatarImage} />
                   ) : (
-                    <LinearGradient colors={[COLORS.primary, COLORS.primaryDark]} style={styles.avatar}>
+                    <View style={[styles.avatar, { backgroundColor: COLORS.primary }]}>
                       <Text style={styles.avatarText}>{recipient.name?.charAt(0)?.toUpperCase()}</Text>
-                    </LinearGradient>
+                    </View>
                   )}
                 </View>
                 <View style={styles.cameraButton}>
@@ -194,7 +188,7 @@ export default function ProfileScreen() {
                 </View>
               )}
             </View>
-          </LinearGradient>
+          </View>
         </View>
 
         {/* Quick Stats */}
