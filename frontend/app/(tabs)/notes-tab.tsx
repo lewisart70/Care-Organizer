@@ -8,7 +8,15 @@ import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/utils/api';
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../../src/constants/theme';
 
-const CATEGORIES = ['general', 'medical', 'behavior', 'dietary', 'activity', 'mood'];
+const CATEGORIES = [
+  { id: 'general', name: 'General', icon: 'document-text', color: '#3498DB' },
+  { id: 'medical', name: 'Medical', icon: 'medical', color: '#E74C3C' },
+  { id: 'incident', name: 'Incident/Fall', icon: 'alert-circle', color: '#E67E22' },
+  { id: 'bathing', name: 'Bathing', icon: 'water', color: '#9B59B6' },
+  { id: 'routine', name: 'Daily Routine', icon: 'time', color: '#1ABC9C' },
+  { id: 'behavior', name: 'Behavior', icon: 'happy', color: '#F39C12' },
+  { id: 'mood', name: 'Mood', icon: 'heart', color: '#E91E63' },
+];
 
 export default function NotesTab() {
   const { selectedRecipientId } = useAuth();
@@ -166,8 +174,18 @@ export default function NotesTab() {
   const filtered = filter === 'all' ? notes : notes.filter(n => n.category === filter);
 
   const getCategoryColor = (cat: string) => {
-    const colors: Record<string, string> = { general: COLORS.info, medical: COLORS.error, behavior: COLORS.warning, dietary: COLORS.secondary, activity: COLORS.primary, mood: '#9B59B6' };
-    return colors[cat] || COLORS.info;
+    const category = CATEGORIES.find(c => c.id === cat);
+    return category?.color || COLORS.info;
+  };
+  
+  const getCategoryIcon = (cat: string) => {
+    const category = CATEGORIES.find(c => c.id === cat);
+    return category?.icon || 'document-text';
+  };
+  
+  const getCategoryName = (cat: string) => {
+    const category = CATEGORIES.find(c => c.id === cat);
+    return category?.name || cat;
   };
 
   if (!selectedRecipientId) return <SafeAreaView style={styles.container}><View style={styles.centered}><Text style={styles.emptyText}>Select a care recipient first</Text></View></SafeAreaView>;
@@ -193,11 +211,23 @@ export default function NotesTab() {
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-        {['all', ...CATEGORIES].map(cat => (
-          <TouchableOpacity key={cat} testID={`filter-${cat}`} style={[styles.filterChip, filter === cat && styles.filterActive]}
-            onPress={() => setFilter(cat)}>
-            <Text style={[styles.filterText, filter === cat && styles.filterTextActive]}>
-              {cat.charAt(0).toUpperCase() + cat.slice(1)}
+        <TouchableOpacity 
+          testID="filter-all" 
+          style={[styles.filterChip, filter === 'all' && styles.filterActive]}
+          onPress={() => setFilter('all')}
+        >
+          <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>All</Text>
+        </TouchableOpacity>
+        {CATEGORIES.map(cat => (
+          <TouchableOpacity 
+            key={cat.id} 
+            testID={`filter-${cat.id}`} 
+            style={[styles.filterChip, filter === cat.id && { backgroundColor: cat.color, borderColor: cat.color }]}
+            onPress={() => setFilter(cat.id)}
+          >
+            <Ionicons name={cat.icon as any} size={14} color={filter === cat.id ? COLORS.white : cat.color} style={{ marginRight: 4 }} />
+            <Text style={[styles.filterText, filter === cat.id && styles.filterTextActive]}>
+              {cat.name}
             </Text>
           </TouchableOpacity>
         ))}
@@ -220,7 +250,8 @@ export default function NotesTab() {
             >
               <View style={styles.noteHeader}>
                 <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(note.category) + '15' }]}>
-                  <Text style={[styles.categoryText, { color: getCategoryColor(note.category) }]}>{note.category}</Text>
+                  <Ionicons name={getCategoryIcon(note.category) as any} size={12} color={getCategoryColor(note.category)} style={{ marginRight: 4 }} />
+                  <Text style={[styles.categoryText, { color: getCategoryColor(note.category) }]}>{getCategoryName(note.category)}</Text>
                 </View>
                 <View style={styles.noteActions}>
                   <TouchableOpacity 
@@ -264,16 +295,31 @@ export default function NotesTab() {
           </View>
           <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
             <Text style={styles.formLabel}>Category</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SPACING.md }}>
+            <View style={styles.categoryGrid}>
               {CATEGORIES.map(cat => (
-                <TouchableOpacity key={cat} testID={`cat-${cat}`} style={[styles.catChip, category === cat && { backgroundColor: getCategoryColor(cat) }]}
-                  onPress={() => setCategory(cat)}>
-                  <Text style={[styles.catChipText, category === cat && { color: COLORS.white }]}>
-                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                <TouchableOpacity 
+                  key={cat.id} 
+                  testID={`cat-${cat.id}`} 
+                  style={[
+                    styles.catChip, 
+                    category === cat.id && { backgroundColor: cat.color, borderColor: cat.color }
+                  ]}
+                  onPress={() => setCategory(cat.id)}
+                >
+                  <Ionicons 
+                    name={cat.icon as any} 
+                    size={16} 
+                    color={category === cat.id ? COLORS.white : cat.color} 
+                  />
+                  <Text style={[
+                    styles.catChipText, 
+                    category === cat.id && { color: COLORS.white }
+                  ]}>
+                    {cat.name}
                   </Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
+            </View>
             
             <View style={styles.noteLabelRow}>
               <Text style={styles.formLabel}>Note</Text>
@@ -398,7 +444,7 @@ const styles = StyleSheet.create({
     elevation: 2 
   },
   noteHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm },
-  categoryBadge: { paddingHorizontal: SPACING.sm, paddingVertical: 2, borderRadius: RADIUS.full },
+  categoryBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.sm, paddingVertical: 2, borderRadius: RADIUS.full },
   categoryText: { fontSize: FONT_SIZES.xs, fontWeight: '700' },
   noteActions: { flexDirection: 'row', gap: SPACING.sm },
   actionBtn: { padding: SPACING.xs, borderRadius: RADIUS.md },
@@ -415,7 +461,23 @@ const styles = StyleSheet.create({
   saveText: { fontSize: FONT_SIZES.md, color: COLORS.primary, fontWeight: '700' },
   modalBody: { padding: SPACING.lg },
   formLabel: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textPrimary, marginBottom: SPACING.xs },
-  catChip: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs, borderRadius: RADIUS.full, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, marginRight: SPACING.sm },
+  categoryGrid: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    gap: SPACING.sm, 
+    marginBottom: SPACING.md 
+  },
+  catChip: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md, 
+    paddingVertical: SPACING.sm, 
+    borderRadius: RADIUS.lg, 
+    backgroundColor: COLORS.surface, 
+    borderWidth: 2, 
+    borderColor: COLORS.border,
+    gap: 6,
+  },
   catChipText: { fontSize: FONT_SIZES.xs, fontWeight: '600', color: COLORS.textSecondary },
   textArea: { backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, padding: SPACING.md, fontSize: FONT_SIZES.md, color: COLORS.textPrimary, minHeight: 150 },
   
