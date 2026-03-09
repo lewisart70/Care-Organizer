@@ -119,7 +119,7 @@ export default function LoginScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.headerSection}>
             <Logo size={80} />
-            <Text style={styles.appTitle}>FamilyCare</Text>
+            <Text style={styles.appTitle}>Family Care</Text>
             <Text style={styles.appSubtitle}>Organizer</Text>
             <Text style={styles.tagline}>Caring for your loved ones, together</Text>
           </View>

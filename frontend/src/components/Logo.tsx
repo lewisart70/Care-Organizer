@@ -6,7 +6,7 @@ interface LogoProps {
 }
 
 /**
- * FamilyCare Organizer Logo
+ * Family Care Organizer Logo
  * Terra cotta heart with caring hands - symbolizing family caregiving support
  */
 export function Logo({ size = 80 }: LogoProps) {

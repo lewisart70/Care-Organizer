@@ -55,7 +55,7 @@ export default function RegisterScreen() {
 
           <View style={styles.headerSection}>
             <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Join FamilyCare to start organizing care for your loved ones</Text>
+            <Text style={styles.subtitle}>Join Family Care to start organizing care for your loved ones</Text>
           </View>
 
           {error ? (

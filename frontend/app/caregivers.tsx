@@ -54,7 +54,7 @@ export default function CaregiversScreen() {
         // Email couldn't be sent (Resend free tier limitation)
         Alert.alert(
           'Invitation Recorded 📝', 
-          `${res.email_note}\n\nPlease share this info with ${caregiverName.trim() || 'the caregiver'}:\n\n1. Download the FamilyCare app\n2. Sign up with: ${email}`,
+          `${res.email_note}\n\nPlease share this info with ${caregiverName.trim() || 'the caregiver'}:\n\n1. Download the Family Care app\n2. Sign up with: ${email}`,
           [{ text: 'Got it', onPress: () => setShowInvite(false) }]
         );
       } else {
@@ -199,7 +199,7 @@ export default function CaregiversScreen() {
               <View style={s.noteBox}>
                 <Ionicons name="information-circle" size={18} color={COLORS.info} />
                 <Text style={s.noteText}>
-                  If they don't have a FamilyCare account yet, the email will include instructions to sign up.
+                  If they don't have a Family Care account yet, the email will include instructions to sign up.
                 </Text>
               </View>
             </ScrollView>

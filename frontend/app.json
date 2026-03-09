@@ -1,32 +1,51 @@
 {
   "expo": {
-    "name": "FamilyCare Organizer",
-    "slug": "frontend",
+    "name": "Family Care Organizer",
+    "slug": "family-care-organizer",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "familycareorganizer",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.familycareorganizer.app",
+      "buildNumber": "1",
       "usesAppleSignIn": true,
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Record voice notes for caregiving observations",
-        "NSCameraUsageDescription": "Add profile photos to identify care recipients",
-        "NSPhotoLibraryUsageDescription": "Choose photos from your library"
+        "NSMicrophoneUsageDescription": "Record voice notes to document caregiving observations and daily care activities",
+        "NSCameraUsageDescription": "Take photos to identify care recipients and document care activities",
+        "NSPhotoLibraryUsageDescription": "Choose profile photos from your library for care recipient identification",
+        "NSHealthShareUsageDescription": "Share health data to help coordinate care for your loved ones",
+        "NSHealthUpdateUsageDescription": "Update health records to maintain accurate care information",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          }
+        ]
       }
     },
     "android": {
+      "package": "com.familycareorganizer.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000"
+        "backgroundColor": "#D97757"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
         "RECORD_AUDIO",
         "CAMERA",
-        "READ_EXTERNAL_STORAGE"
+        "READ_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES"
       ]
     },
     "web": {
@@ -42,27 +61,34 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000"
+          "backgroundColor": "#D97757"
         }
       ],
       "expo-secure-store",
       [
         "expo-audio",
         {
-          "microphonePermission": "Record voice notes for caregiving observations"
+          "microphonePermission": "Record voice notes to document caregiving observations and daily care activities"
         }
       ],
       [
         "expo-image-picker",
         {
-          "cameraPermission": "Take photos of care recipients for identification",
-          "photosPermission": "Choose profile photos from your library"
+          "cameraPermission": "Take photos to identify care recipients and document care activities",
+          "photosPermission": "Choose profile photos from your library for care recipient identification"
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "your-eas-project-id"
+      }
+    },
+    "owner": "your-expo-username"
   }
 }
