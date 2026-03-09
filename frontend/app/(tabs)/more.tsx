@@ -11,6 +11,7 @@ const menuItems = [
   { icon: 'download', label: 'Export Report', route: '/export-report', color: '#8E44AD' },
   { icon: 'medical', label: 'Doctors & Specialists', route: '/doctors', color: COLORS.primary },
   { icon: 'call', label: 'Emergency Contacts', route: '/emergency-contacts', color: COLORS.error },
+  { icon: 'shield-checkmark', label: 'Privacy & Data', route: '/privacy-settings', color: '#27AE60' },
   { icon: 'book', label: 'About the Book', route: '/about-book', color: '#D97757' },
 ];
 
