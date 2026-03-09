@@ -3,20 +3,19 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAudioRecorder, RecordingPresets, setAudioModeAsync } from 'expo-audio';
 import { useAuth } from '../../src/context/AuthContext';
 import { api } from '../../src/utils/api';
 import { COLORS, SPACING, FONT_SIZES, RADIUS, SHADOWS } from '../../src/constants/theme';
 
 const CATEGORIES = [
-  { id: 'general', name: 'General', icon: 'document-text', color: '#3498DB', gradient: ['#3498DB', '#2980B9'] },
-  { id: 'medical', name: 'Medical', icon: 'medical', color: '#E74C3C', gradient: ['#E74C3C', '#C0392B'] },
-  { id: 'incident', name: 'Incident/Fall', icon: 'alert-circle', color: '#E67E22', gradient: ['#F39C12', '#E67E22'] },
-  { id: 'bathing', name: 'Bathing', icon: 'water', color: '#9B59B6', gradient: ['#9B59B6', '#8E44AD'] },
-  { id: 'routine', name: 'Daily Routine', icon: 'time', color: '#1ABC9C', gradient: ['#1ABC9C', '#16A085'] },
-  { id: 'behavior', name: 'Behavior', icon: 'happy', color: '#F39C12', gradient: ['#F1C40F', '#F39C12'] },
-  { id: 'mood', name: 'Mood', icon: 'heart', color: '#E91E63', gradient: ['#E91E63', '#C2185B'] },
+  { id: 'general', name: 'General', icon: 'document-text', color: '#3498DB' },
+  { id: 'medical', name: 'Medical', icon: 'medical', color: '#E74C3C' },
+  { id: 'incident', name: 'Incident/Fall', icon: 'alert-circle', color: '#E67E22' },
+  { id: 'bathing', name: 'Bathing', icon: 'water', color: '#9B59B6' },
+  { id: 'routine', name: 'Daily Routine', icon: 'time', color: '#1ABC9C' },
+  { id: 'behavior', name: 'Behavior', icon: 'happy', color: '#F39C12' },
+  { id: 'mood', name: 'Mood', icon: 'heart', color: '#E91E63' },
 ];
 
 export default function NotesTab() {

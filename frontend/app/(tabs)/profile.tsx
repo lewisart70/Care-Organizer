@@ -108,17 +108,17 @@ export default function ProfileScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.centered}>
           <View style={styles.emptyIconWrapper}>
-            <LinearGradient colors={[COLORS.primaryLight, COLORS.primary + '20']} style={styles.emptyIcon}>
+            <View style={[styles.emptyIcon, { backgroundColor: COLORS.primaryLight }]}>
               <Ionicons name="person-add" size={48} color={COLORS.primary} />
-            </LinearGradient>
+            </View>
           </View>
           <Text style={styles.emptyTitle}>No Care Recipient</Text>
-          <Text style={styles.emptyText}>Add someone you&apos;re caring for to get started</Text>
+          <Text style={styles.emptyText}>Add someone you are caring for to get started</Text>
           <TouchableOpacity testID="add-recipient-profile-btn" style={styles.addBtn} onPress={() => router.push('/add-recipient')} activeOpacity={0.8}>
-            <LinearGradient colors={[COLORS.primary, COLORS.primaryDark]} style={styles.addBtnGradient}>
+            <View style={[styles.addBtnGradient, { backgroundColor: COLORS.primary }]}>
               <Ionicons name="add" size={20} color={COLORS.white} />
               <Text style={styles.addBtnText}>Add Care Recipient</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -152,41 +152,27 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Premium Profile Card */}
         <View style={styles.profileCardWrapper}>
           <View style={styles.profileCardGradient}>
             <View style={styles.profileCard}>
-              {/* Avatar with Camera Button */}
               <TouchableOpacity onPress={showPhotoOptions} style={styles.avatarContainer} disabled={uploadingPhoto} activeOpacity={0.8}>
                 <View style={styles.avatarWrapper}>
                   {uploadingPhoto ? (
-                    <View style={[styles.avatar, { backgroundColor: COLORS.primary }]}>
-                      <ActivityIndicator color={COLORS.white} />
-                    </View>
+                    <View style={[styles.avatar, { backgroundColor: COLORS.primary }]}><ActivityIndicator color={COLORS.white} /></View>
                   ) : recipient.profile_picture ? (
                     <Image source={{ uri: recipient.profile_picture }} style={styles.avatarImage} />
                   ) : (
-                    <View style={[styles.avatar, { backgroundColor: COLORS.primary }]}>
-                      <Text style={styles.avatarText}>{recipient.name?.charAt(0)?.toUpperCase()}</Text>
-                    </View>
+                    <View style={[styles.avatar, { backgroundColor: COLORS.primary }]}><Text style={styles.avatarText}>{recipient.name?.charAt(0)?.toUpperCase()}</Text></View>
                   )}
                 </View>
-                <View style={styles.cameraButton}>
-                  <Ionicons name="camera" size={14} color={COLORS.white} />
-                </View>
+                <View style={styles.cameraButton}><Ionicons name="camera" size={14} color={COLORS.white} /></View>
               </TouchableOpacity>
-
-              {/* Name and Age */}
               <Text style={styles.name}>{recipient.name}</Text>
-              {age && <Text style={styles.age}>{age} years old</Text>}
+              {age ? <Text style={styles.age}>{age} years old</Text> : null}
               <Text style={styles.tapHint}>Tap photo to change</Text>
-
-              {/* Bio/Notes */}
-              {recipient.notes && (
-                <View style={styles.bioContainer}>
-                  <Text style={styles.bio}>{recipient.notes}</Text>
-                </View>
-              )}
+              {recipient.notes ? (
+                <View style={styles.bioContainer}><Text style={styles.bio}>{recipient.notes}</Text></View>
+              ) : null}
             </View>
           </View>
         </View>
