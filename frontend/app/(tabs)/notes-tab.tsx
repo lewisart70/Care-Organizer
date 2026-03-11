@@ -132,20 +132,25 @@ export default function NotesTab() {
 
   const handleSave = async () => {
     if (!content.trim()) { Alert.alert('Required', 'Please enter a note'); return; }
+    if (!selectedRecipientId) { Alert.alert('Error', 'Please select a care recipient first'); return; }
     setSaving(true);
     try {
       if (editingNote) {
-        await api.put(`/care-recipients/${selectedRecipientId}/notes/${editingNote.note_id}`, { content, category });
+        await api.put(`/care-recipients/${selectedRecipientId}/notes/${editingNote.note_id || editingNote.id}`, { content, category });
         Alert.alert('Updated', 'Note updated successfully');
       } else {
         await api.post(`/care-recipients/${selectedRecipientId}/notes`, { content, category });
+        Alert.alert('Success', 'Note saved!', [
+          { text: 'Add Another', onPress: () => setShowAdd(true) },
+          { text: 'Done', style: 'default' }
+        ]);
       }
       setShowAdd(false); 
       setEditingNote(null);
       setContent(''); 
       setCategory('general');
       await loadNotes();
-    } catch (e: any) { Alert.alert('Error', e.message); }
+    } catch (e: any) { Alert.alert('Error', e.message || 'Failed to save note'); }
     finally { setSaving(false); }
   };
 
