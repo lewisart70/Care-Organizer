@@ -55,11 +55,21 @@ export default function MedicationsTab() {
     }
     setSaving(true);
     try {
-      await api.post(`/care-recipients/${selectedRecipientId}/medications`, form);
+      // Convert time_of_day to array if it's a string
+      const payload = {
+        ...form,
+        time_of_day: form.time_of_day ? [form.time_of_day] : [],
+        notes: form.instructions || null,
+      };
+      await api.post(`/care-recipients/${selectedRecipientId}/medications`, payload);
       setShowAdd(false);
       setForm({ name: '', dosage: '', frequency: '', time_of_day: '', instructions: '', prescribing_doctor: '' });
       await loadMeds();
-    } catch (e: any) { Alert.alert('Error', e.message); }
+      Alert.alert('Success', 'Medication added!', [
+        { text: 'Add Another', onPress: () => setShowAdd(true) },
+        { text: 'Done', style: 'default' }
+      ]);
+    } catch (e: any) { Alert.alert('Error', e.message || 'Failed to save medication'); }
     finally { setSaving(false); }
   };
 
