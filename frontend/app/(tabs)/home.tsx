@@ -23,7 +23,9 @@ export default function HomeScreen() {
       const recs = await api.get('/care-recipients');
       setRecipients(recs);
       if (recs.length > 0) {
-        const activeId = selectedRecipientId || recs[0].recipient_id;
+        // Handle both id formats from backend
+        const firstRecId = recs[0].recipient_id || recs[0].id;
+        const activeId = selectedRecipientId || firstRecId;
         if (!selectedRecipientId) setSelectedRecipientId(activeId);
         const dash = await api.get(`/dashboard/${activeId}`);
         setDashboard(dash);
@@ -40,7 +42,7 @@ export default function HomeScreen() {
 
   const onRefresh = () => { setRefreshing(true); loadData(); };
 
-  const activeRecipient = recipients.find(r => r.recipient_id === selectedRecipientId);
+  const activeRecipient = recipients.find(r => (r.recipient_id || r.id) === selectedRecipientId);
 
   if (loading) {
     return (
