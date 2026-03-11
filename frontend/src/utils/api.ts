@@ -1,4 +1,4 @@
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://api.familycareorganizer.com';
+const BACKEND_URL = 'https://api.familycareorganizer.com';
 
 class ApiClient {
   private token: string | null = null;
