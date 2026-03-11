@@ -138,14 +138,20 @@ export default function NotesTab() {
     try {
       if (editingNote) {
         await api.put(`/care-recipients/${selectedRecipientId}/notes/${editingNote.note_id || editingNote.id}`, { content, category });
+        // For edits, just close and reload
+        setShowAdd(false);
+        setEditingNote(null);
+        setContent(''); 
+        setCategory('general');
+        await loadNotes();
       } else {
         await api.post(`/care-recipients/${selectedRecipientId}/notes`, { content, category });
+        setEditingNote(null);
+        setContent(''); 
+        setCategory('general');
+        await loadNotes();
+        setShowSuccess(true);
       }
-      setEditingNote(null);
-      setContent(''); 
-      setCategory('general');
-      await loadNotes();
-      setShowSuccess(true);
     } catch (e: any) { Alert.alert('Error', e.message || 'Failed to save note'); }
     finally { setSaving(false); }
   };
