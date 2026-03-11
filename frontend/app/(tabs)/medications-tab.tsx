@@ -95,8 +95,10 @@ export default function MedicationsTab() {
     finally { setSavingPharmacy(false); }
   };
 
-  const getTimeColor = (timeOfDay: string) => {
-    const key = timeOfDay?.toLowerCase() || '';
+  const getTimeColor = (timeOfDay: string | string[] | undefined) => {
+    // Handle array or string format
+    const timeStr = Array.isArray(timeOfDay) ? timeOfDay[0] : timeOfDay;
+    const key = timeStr?.toLowerCase() || '';
     return TIME_COLORS[key] || COLORS.primary;
   };
 
