@@ -101,10 +101,13 @@ export default function AddRecipientScreen() {
       };
       const result = await api.post('/care-recipients', body);
       
+      // Get the recipient ID from the response (handle both formats)
+      const recipientId = result.recipient_id || result.id;
+      
       // Upload profile photo if one was selected
-      if (profilePhoto) {
+      if (profilePhoto && recipientId) {
         try {
-          await api.post(`/care-recipients/${result.recipient_id}/profile-photo`, {
+          await api.post(`/care-recipients/${recipientId}/profile-photo`, {
             photo_base64: profilePhoto
           });
         } catch (photoErr) {
@@ -113,7 +116,9 @@ export default function AddRecipientScreen() {
         }
       }
       
-      setSelectedRecipientId(result.recipient_id);
+      if (recipientId) {
+        setSelectedRecipientId(recipientId);
+      }
       router.back();
     } catch (e: any) { Alert.alert('Error', e.message); }
     finally { setSaving(false); }
