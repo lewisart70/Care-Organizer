@@ -27,6 +27,7 @@ export default function NotesTab() {
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('general');
   const [saving, setSaving] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const [filter, setFilter] = useState('all');
   
   // Voice recording state
@@ -137,21 +138,27 @@ export default function NotesTab() {
     try {
       if (editingNote) {
         await api.put(`/care-recipients/${selectedRecipientId}/notes/${editingNote.note_id || editingNote.id}`, { content, category });
-        Alert.alert('Updated', 'Note updated successfully');
       } else {
         await api.post(`/care-recipients/${selectedRecipientId}/notes`, { content, category });
-        Alert.alert('Success', 'Note saved!', [
-          { text: 'Add Another', onPress: () => setShowAdd(true) },
-          { text: 'Done', style: 'default' }
-        ]);
       }
-      setShowAdd(false); 
       setEditingNote(null);
       setContent(''); 
       setCategory('general');
       await loadNotes();
+      setShowSuccess(true);
     } catch (e: any) { Alert.alert('Error', e.message || 'Failed to save note'); }
     finally { setSaving(false); }
+  };
+  
+  const handleAddAnother = () => {
+    setShowSuccess(false);
+    setContent('');
+    setCategory('general');
+  };
+  
+  const handleDone = () => {
+    setShowSuccess(false);
+    setShowAdd(false);
   };
 
   const handleDelete = (noteId: string) => {
@@ -289,8 +296,27 @@ export default function NotesTab() {
 
       <Modal visible={showAdd} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={styles.modalContainer}>
+          {showSuccess ? (
+            <View style={styles.successContainer}>
+              <View style={styles.successIcon}>
+                <Ionicons name="checkmark-circle" size={80} color={COLORS.success} />
+              </View>
+              <Text style={styles.successTitle}>Note Saved!</Text>
+              <Text style={styles.successSubtitle}>Your note has been added successfully.</Text>
+              <View style={styles.successButtons}>
+                <TouchableOpacity style={styles.addAnotherBtn} onPress={handleAddAnother}>
+                  <Ionicons name="add" size={20} color={COLORS.primary} />
+                  <Text style={styles.addAnotherText}>Add Another Note</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.doneBtn} onPress={handleDone}>
+                  <Text style={styles.doneBtnText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+          <>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => { setShowAdd(false); setEditingNote(null); setContent(''); }}>
+            <TouchableOpacity onPress={() => { setShowAdd(false); setEditingNote(null); setContent(''); setShowSuccess(false); }}>
               <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>{editingNote ? 'Edit Note' : 'Add Note'}</Text>
@@ -388,6 +414,8 @@ export default function NotesTab() {
               </Text>
             </View>
           </ScrollView>
+          </>
+          )}
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -623,5 +651,57 @@ const styles = StyleSheet.create({
     color: COLORS.secondary,
     flex: 1,
     fontWeight: '500',
+  },
+  // Success screen styles
+  successContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.xl,
+  },
+  successIcon: {
+    marginBottom: SPACING.xl,
+  },
+  successTitle: {
+    fontSize: FONT_SIZES.xxl,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.sm,
+  },
+  successSubtitle: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: SPACING.xxl,
+  },
+  successButtons: {
+    width: '100%',
+    gap: SPACING.md,
+  },
+  addAnotherBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.lg,
+    backgroundColor: COLORS.primaryLight,
+    borderRadius: RADIUS.xl,
+    gap: SPACING.sm,
+  },
+  addAnotherText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  doneBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.lg,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.xl,
+  },
+  doneBtnText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+    color: COLORS.white,
   },
 });
