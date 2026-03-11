@@ -23,7 +23,7 @@ export default function MedicationsTab() {
   const [meds, setMeds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: '', dosage: '', frequency: '', time_of_day: '', instructions: '', prescribing_doctor: '' });
+  const [form, setForm] = useState({ name: '', dosage: '', frequency: '', time_of_day: [] as string[], instructions: '', prescribing_doctor: '' });
   const [saving, setSaving] = useState(false);
   
   // Pharmacy state
@@ -55,15 +55,15 @@ export default function MedicationsTab() {
     }
     setSaving(true);
     try {
-      // Convert time_of_day to array if it's a string
+      // time_of_day is already an array
       const payload = {
         ...form,
-        time_of_day: form.time_of_day ? [form.time_of_day] : [],
+        time_of_day: form.time_of_day,
         notes: form.instructions || null,
       };
       await api.post(`/care-recipients/${selectedRecipientId}/medications`, payload);
       setShowAdd(false);
-      setForm({ name: '', dosage: '', frequency: '', time_of_day: '', instructions: '', prescribing_doctor: '' });
+      setForm({ name: '', dosage: '', frequency: '', time_of_day: [], instructions: '', prescribing_doctor: '' });
       await loadMeds();
       Alert.alert('Success', 'Medication added!', [
         { text: 'Add Another', onPress: () => setShowAdd(true) },
@@ -275,17 +275,28 @@ export default function MedicationsTab() {
             {/* Time of Day Quick Select */}
             <Text style={styles.formLabel}>Quick Select Time</Text>
             <View style={styles.timeChips}>
-              {Object.entries(TIME_COLORS).map(([time, color]) => (
+              {Object.entries(TIME_COLORS).map(([time, color]) => {
+                const isSelected = form.time_of_day.map(t => t.toLowerCase()).includes(time);
+                return (
                 <TouchableOpacity
                   key={time}
-                  style={[styles.timeChip, form.time_of_day.toLowerCase() === time && { backgroundColor: color }]}
-                  onPress={() => setForm({ ...form, time_of_day: time.charAt(0).toUpperCase() + time.slice(1) })}
+                  style={[styles.timeChip, isSelected && { backgroundColor: color }]}
+                  onPress={() => {
+                    const formattedTime = time.charAt(0).toUpperCase() + time.slice(1);
+                    if (isSelected) {
+                      // Remove if already selected
+                      setForm({ ...form, time_of_day: form.time_of_day.filter(t => t.toLowerCase() !== time) });
+                    } else {
+                      // Add if not selected
+                      setForm({ ...form, time_of_day: [...form.time_of_day, formattedTime] });
+                    }
+                  }}
                 >
-                  <Text style={[styles.timeChipText, form.time_of_day.toLowerCase() === time && { color: COLORS.white }]}>
+                  <Text style={[styles.timeChipText, isSelected && { color: COLORS.white }]}>
                     {time.charAt(0).toUpperCase() + time.slice(1)}
                   </Text>
                 </TouchableOpacity>
-              ))}
+              )})}
             </View>
           </ScrollView>
         </SafeAreaView>
