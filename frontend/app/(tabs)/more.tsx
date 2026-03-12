@@ -7,9 +7,10 @@ import { useAuth } from '../../src/context/AuthContext';
 import { COLORS, SPACING, FONT_SIZES, RADIUS, SHADOWS } from '../../src/constants/theme';
 
 const menuItems = [
+  { icon: 'people', label: 'Care Team', description: 'Invite family & caregivers', route: '/caregivers', color: '#3498DB' },
   { icon: 'search-circle', label: 'Find Local Support', description: 'AI-powered resource finder', route: '/find-support', color: '#1ABC9C' },
   { icon: 'download', label: 'Export Report', description: 'Generate PDF care reports', route: '/export-report', color: '#8E44AD' },
-  { icon: 'medical', label: 'Doctors & Specialists', description: 'Manage care team', route: '/doctors', color: COLORS.primary },
+  { icon: 'medical', label: 'Doctors & Specialists', description: 'Manage healthcare team', route: '/doctors', color: COLORS.primary },
   { icon: 'call', label: 'Emergency Contacts', description: 'Quick access contacts', route: '/emergency-contacts', color: COLORS.error },
   { icon: 'shield-checkmark', label: 'Privacy & Data', description: 'Manage your data', route: '/privacy-settings', color: '#27AE60' },
   { icon: 'book', label: 'About the Book', description: 'The Family Care Organizer', route: '/about-book', color: '#D97757' },
