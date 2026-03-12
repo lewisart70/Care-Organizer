@@ -386,7 +386,7 @@ export default function AppointmentsScreen() {
               </TouchableOpacity>
             </View>
             
-            {/* Date Picker Modal for iOS / Inline for Android */}
+            {/* Date Picker - Platform specific */}
             {showDatePicker && Platform.OS === 'ios' && (
               <Modal transparent animationType="slide">
                 <View style={s.datePickerOverlay}>
@@ -419,6 +419,44 @@ export default function AppointmentsScreen() {
                 display="default"
                 onChange={handleDateChange}
               />
+            )}
+            
+            {/* Web fallback - simple date input */}
+            {showDatePicker && Platform.OS === 'web' && (
+              <Modal transparent animationType="fade">
+                <View style={s.datePickerOverlay}>
+                  <View style={s.datePickerModal}>
+                    <View style={s.datePickerHeader}>
+                      <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                        <Text style={s.datePickerCancel}>Cancel</Text>
+                      </TouchableOpacity>
+                      <Text style={s.datePickerTitle}>Select Date</Text>
+                      <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                        <Text style={s.datePickerDone}>Done</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={{ padding: SPACING.lg, alignItems: 'center' }}>
+                      <TextInput
+                        style={[s.fi, { width: '100%', textAlign: 'center' }]}
+                        placeholder="YYYY-MM-DD"
+                        placeholderTextColor={COLORS.border}
+                        value={form.date}
+                        onChangeText={(text) => {
+                          setForm({ ...form, date: text });
+                          // Try to parse the date
+                          const parsed = new Date(text);
+                          if (!isNaN(parsed.getTime())) {
+                            setSelectedDate(parsed);
+                          }
+                        }}
+                      />
+                      <Text style={{ marginTop: SPACING.md, color: COLORS.textSecondary, fontSize: FONT_SIZES.xs }}>
+                        Enter date in YYYY-MM-DD format (e.g., 2026-03-20)
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </Modal>
             )}
             {/* Vitals Section */}
             <View style={s.vitalsSection}>
