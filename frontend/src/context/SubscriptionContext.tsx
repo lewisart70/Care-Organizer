@@ -106,8 +106,8 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const updateSubscriptionStatus = (info: CustomerInfo) => {
     setCustomerInfo(info);
     
-    // Check for active entitlements
-    const premiumEntitlement = info.entitlements.active['premium'];
+    // Check for active entitlements - using "FamilyCare Pro" entitlement
+    const premiumEntitlement = info.entitlements.active['FamilyCare Pro'];
     const isActive = !!premiumEntitlement;
     setIsSubscribed(isActive);
     
@@ -138,7 +138,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       const info = await Purchases.restorePurchases();
       updateSubscriptionStatus(info);
       
-      if (info.entitlements.active['premium']) {
+      if (info.entitlements.active['FamilyCare Pro']) {
         Alert.alert('Success', 'Your subscription has been restored!');
         return true;
       } else {
