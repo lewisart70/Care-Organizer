@@ -3,8 +3,8 @@ import { Platform, Alert } from 'react-native';
 import Purchases, { LOG_LEVEL, PurchasesOffering, CustomerInfo, PurchasesPackage } from 'react-native-purchases';
 import { useAuth } from './AuthContext';
 
-// RevenueCat API Keys
-const REVENUECAT_API_KEY = 'sk_pWoqIXazCQSzmuPKReZyiyhPlJXuW';
+// RevenueCat API Keys - loaded from environment variables
+const REVENUECAT_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || '';
 
 // Usage limits for free users
 export const FREE_LIMITS = {
