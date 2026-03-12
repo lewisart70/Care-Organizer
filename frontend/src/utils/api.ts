@@ -1,4 +1,4 @@
-const BACKEND_URL = 'https://profile-nav-fix-3.preview.emergentagent.com';
+const BACKEND_URL = 'https://api.familycareorganizer.com';
 
 class ApiClient {
   private token: string | null = null;
