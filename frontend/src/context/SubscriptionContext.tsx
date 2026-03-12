@@ -4,7 +4,7 @@ import Purchases, { LOG_LEVEL, PurchasesOffering, CustomerInfo, PurchasesPackage
 import { useAuth } from './AuthContext';
 
 // RevenueCat API Keys
-const REVENUECAT_API_KEY = 'test_xKKvmIoMLZwfPELEBDNrSCsYfEq';
+const REVENUECAT_API_KEY = 'sk_pWoqIXazCQSzmuPKReZyiyhPlJXuW';
 
 // Usage limits for free users
 export const FREE_LIMITS = {
