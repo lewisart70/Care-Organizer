@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, TouchableOpacity, StyleSheet, ScrollView, 
-  ActivityIndicator, TextInput, Alert, Platform
+  ActivityIndicator, TextInput, Alert, Platform, Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -41,6 +41,8 @@ export default function ExportReportScreen() {
   const [recipientEmail, setRecipientEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingSections, setLoadingSections] = useState(true);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successEmail, setSuccessEmail] = useState('');
 
   useEffect(() => {
     loadSections();
@@ -180,7 +182,10 @@ export default function ExportReportScreen() {
           recipient_email: deliveryMethod === 'email_other' ? recipientEmail.trim() : undefined,
         });
 
-        Alert.alert('Success', result.message || 'Report sent successfully!');
+        // Show success modal for email
+        const emailSentTo = deliveryMethod === 'email_other' ? recipientEmail.trim() : (user?.email || 'your email');
+        setSuccessEmail(emailSentTo);
+        setShowSuccessModal(true);
       }
     } catch (e: any) {
       console.error('Export error:', e);
@@ -391,6 +396,40 @@ export default function ExportReportScreen() {
 
         <View style={{ height: SPACING.xxl }} />
       </ScrollView>
+
+      {/* Email Success Modal */}
+      <Modal visible={showSuccessModal} transparent animationType="fade">
+        <View style={styles.successOverlay}>
+          <View style={styles.successModal}>
+            <View style={styles.successIconContainer}>
+              <Ionicons name="checkmark-circle" size={64} color={COLORS.success} />
+            </View>
+            <Text style={styles.successTitle}>Report Sent!</Text>
+            <Text style={styles.successMessage}>
+              Your care report has been successfully sent to:
+            </Text>
+            <Text style={styles.successEmail}>{successEmail}</Text>
+            <Text style={styles.successNote}>
+              Please check your inbox (and spam folder) for the PDF report.
+            </Text>
+            <TouchableOpacity 
+              style={styles.successButton}
+              onPress={() => {
+                setShowSuccessModal(false);
+                router.back();
+              }}
+            >
+              <Text style={styles.successButtonText}>Done</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.successSecondaryButton}
+              onPress={() => setShowSuccessModal(false)}
+            >
+              <Text style={styles.successSecondaryButtonText}>Send Another Report</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -544,4 +583,72 @@ const styles = StyleSheet.create({
   emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: SPACING.xxl },
   emptyTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary, marginTop: SPACING.md },
   emptyText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: SPACING.xs },
+
+  // Success Modal Styles
+  successOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  successModal: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.xl,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 340,
+  },
+  successIconContainer: {
+    marginBottom: SPACING.md,
+  },
+  successTitle: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.sm,
+  },
+  successMessage: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: SPACING.xs,
+  },
+  successEmail: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+    color: COLORS.primary,
+    marginBottom: SPACING.md,
+  },
+  successNote: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+    lineHeight: 18,
+  },
+  successButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xxl,
+    borderRadius: RADIUS.lg,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  successButtonText: {
+    color: COLORS.white,
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+  },
+  successSecondaryButton: {
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+  },
+  successSecondaryButtonText: {
+    color: COLORS.primary,
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '600',
+  },
 });
