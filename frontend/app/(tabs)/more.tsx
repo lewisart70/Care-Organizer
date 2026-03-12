@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
+import { useSubscription } from '../../src/context/SubscriptionContext';
 import { COLORS, SPACING, FONT_SIZES, RADIUS, SHADOWS } from '../../src/constants/theme';
 
 const menuItems = [
@@ -19,6 +20,7 @@ const menuItems = [
 export default function MoreScreen() {
   const router = useRouter();
   const { logout, user } = useAuth();
+  const { isSubscribed, isTrialActive } = useSubscription();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -49,6 +51,43 @@ export default function MoreScreen() {
             </View>
           </View>
         </View>
+
+        {/* Premium Subscription Banner */}
+        {!isSubscribed && (
+          <TouchableOpacity 
+            style={styles.premiumBanner}
+            onPress={() => router.push('/paywall')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.premiumBannerIcon}>
+              <Ionicons name="star" size={24} color={COLORS.white} />
+            </View>
+            <View style={styles.premiumBannerContent}>
+              <Text style={styles.premiumBannerTitle}>Upgrade to Premium</Text>
+              <Text style={styles.premiumBannerSubtitle}>14-day free trial • Unlimited features</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={COLORS.white} />
+          </TouchableOpacity>
+        )}
+        
+        {isSubscribed && (
+          <TouchableOpacity 
+            style={[styles.premiumBanner, styles.premiumBannerActive]}
+            onPress={() => router.push('/paywall')}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.premiumBannerIcon, { backgroundColor: COLORS.success }]}>
+              <Ionicons name="checkmark-circle" size={24} color={COLORS.white} />
+            </View>
+            <View style={styles.premiumBannerContent}>
+              <Text style={[styles.premiumBannerTitle, { color: COLORS.textPrimary }]}>Premium Member</Text>
+              <Text style={[styles.premiumBannerSubtitle, { color: COLORS.textSecondary }]}>
+                {isTrialActive ? 'Free trial active' : 'Unlimited access enabled'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={COLORS.success} />
+          </TouchableOpacity>
+        )}
 
         {/* Section Label */}
         <View style={styles.sectionHeader}>
@@ -278,5 +317,44 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     textAlign: 'center',
     marginTop: SPACING.xl,
+  },
+
+  // Premium Banner
+  premiumBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.lg,
+    padding: SPACING.md,
+    borderRadius: RADIUS.lg,
+    ...SHADOWS.md,
+  },
+  premiumBannerActive: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.success,
+  },
+  premiumBannerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.md,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING.md,
+  },
+  premiumBannerContent: {
+    flex: 1,
+  },
+  premiumBannerTitle: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  premiumBannerSubtitle: {
+    fontSize: FONT_SIZES.xs,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
   },
 });
