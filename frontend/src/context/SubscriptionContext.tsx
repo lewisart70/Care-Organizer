@@ -9,9 +9,9 @@ const REVENUECAT_API_KEY = 'test_xKKvmIoMLZwfPELEBDNrSCsYfEq';
 // Usage limits for free users
 export const FREE_LIMITS = {
   careRecipients: 1,
-  aiQueriesPerMonth: 5,
-  pdfExportsPerMonth: 2,
-  careTeamInvites: 2,
+  aiQueriesPerMonth: 1,
+  pdfExportsPerMonth: 1,
+  careTeamInvites: 1,
 };
 
 export const PREMIUM_LIMITS = {

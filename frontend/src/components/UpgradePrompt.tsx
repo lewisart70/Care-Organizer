@@ -14,13 +14,13 @@ interface UpgradePromptProps {
 
 const FEATURE_INFO = {
   ai: {
-    title: 'AI Queries Limit Reached',
-    description: `You've used all ${FREE_LIMITS.aiQueriesPerMonth} free AI queries this month.`,
+    title: 'AI Query Limit Reached',
+    description: `You've used your free AI query this month.`,
     icon: 'search',
   },
   pdf: {
     title: 'PDF Export Limit Reached',
-    description: `You've used all ${FREE_LIMITS.pdfExportsPerMonth} free PDF exports this month.`,
+    description: `You've used your free PDF export this month.`,
     icon: 'document-text',
   },
   recipients: {
@@ -30,7 +30,7 @@ const FEATURE_INFO = {
   },
   invites: {
     title: 'Invite Limit Reached',
-    description: `Free accounts can invite up to ${FREE_LIMITS.careTeamInvites} team members.`,
+    description: `Free accounts can invite ${FREE_LIMITS.careTeamInvites} team member.`,
     icon: 'person-add',
   },
 };

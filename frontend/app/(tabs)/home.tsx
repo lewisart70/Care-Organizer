@@ -7,16 +7,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
+import { useSubscription } from '../../src/context/SubscriptionContext';
 import { api } from '../../src/utils/api';
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../../src/constants/theme';
+import { UpgradePrompt } from '../../src/components/UpgradePrompt';
 
 export default function HomeScreen() {
-  const { user, logout, selectedRecipientId, setSelectedRecipientId } = useAuth();
+  const { user, logout, selectedRecipientId, setSelectedRecipientId, isProfileOwner, setIsProfileOwner } = useAuth();
+  const { isSubscribed } = useSubscription();
   const router = useRouter();
   const [recipients, setRecipients] = useState<any[]>([]);
   const [dashboard, setDashboard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -29,6 +33,13 @@ export default function HomeScreen() {
         if (!selectedRecipientId) setSelectedRecipientId(activeId);
         const dash = await api.get(`/dashboard/${activeId}`);
         setDashboard(dash);
+        
+        // Check if user is owner of any recipient (created_by matches user_id)
+        const isOwner = recs.some((r: any) => r.created_by === user?.user_id);
+        setIsProfileOwner(isOwner);
+      } else {
+        // No recipients - user is not an owner yet (new user)
+        setIsProfileOwner(true); // Allow new users to create their first profile
       }
     } catch (e) {
       console.error(e);
@@ -36,13 +47,23 @@ export default function HomeScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedRecipientId]);
+  }, [selectedRecipientId, user?.user_id, setIsProfileOwner]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   const onRefresh = () => { setRefreshing(true); loadData(); };
 
   const activeRecipient = recipients.find(r => (r.recipient_id || r.id) === selectedRecipientId);
+
+  // Handler for when invited users try to add a recipient
+  const handleAddRecipient = () => {
+    // If user is not a profile owner (invited user) and not subscribed, show upgrade prompt
+    if (!isProfileOwner && !isSubscribed) {
+      setShowUpgradePrompt(true);
+    } else {
+      router.push('/add-recipient');
+    }
+  };
 
   if (loading) {
     return (
@@ -74,11 +95,18 @@ export default function HomeScreen() {
           </View>
           <Text style={styles.emptyTitle}>No care recipients yet</Text>
           <Text style={styles.emptyText}>Add someone you're caring for to get started</Text>
-          <TouchableOpacity style={styles.addButton} onPress={() => router.push('/add-recipient')}>
+          <TouchableOpacity style={styles.addButton} onPress={handleAddRecipient}>
             <Ionicons name="add" size={20} color={COLORS.white} />
             <Text style={styles.addButtonText}>Add Care Recipient</Text>
           </TouchableOpacity>
         </View>
+        
+        {/* Upgrade Prompt for invited users */}
+        <UpgradePrompt 
+          visible={showUpgradePrompt} 
+          onClose={() => setShowUpgradePrompt(false)} 
+          feature="recipients" 
+        />
       </SafeAreaView>
     );
   }

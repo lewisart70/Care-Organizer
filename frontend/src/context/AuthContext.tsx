@@ -17,11 +17,13 @@ interface AuthContextType {
   isLoading: boolean;
   selectedRecipientId: string | null;
   disclaimerAccepted: boolean;
+  isProfileOwner: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   loginWithGoogle: (sessionId: string) => Promise<void>;
   logout: () => Promise<void>;
   setSelectedRecipientId: (id: string | null) => void;
+  setIsProfileOwner: (isOwner: boolean) => void;
   acceptDisclaimer: () => void;
 }
 
@@ -31,11 +33,13 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   selectedRecipientId: null,
   disclaimerAccepted: false,
+  isProfileOwner: true,
   login: async () => {},
   register: async () => {},
   loginWithGoogle: async () => {},
   logout: async () => {},
   setSelectedRecipientId: () => {},
+  setIsProfileOwner: () => {},
   acceptDisclaimer: () => {},
 });
 
@@ -48,6 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [selectedRecipientId, setSelectedRecipientId] = useState<string | null>(null);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
   const [showDisclaimerModal, setShowDisclaimerModal] = useState(false);
+  const [isProfileOwner, setIsProfileOwner] = useState(true);
 
   const loadToken = useCallback(async () => {
     try {
@@ -142,6 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setSelectedRecipientId(null);
     setDisclaimerAccepted(false);
+    setIsProfileOwner(true);
     api.setToken(null);
     await AsyncStorage.removeItem('auth_token');
     await AsyncStorage.removeItem('selected_recipient_id');
@@ -157,9 +163,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      user, token, isLoading, selectedRecipientId, disclaimerAccepted,
+      user, token, isLoading, selectedRecipientId, disclaimerAccepted, isProfileOwner,
       login, register, loginWithGoogle, logout,
       setSelectedRecipientId: handleSetRecipientId,
+      setIsProfileOwner,
       acceptDisclaimer,
     }}>
       {children}

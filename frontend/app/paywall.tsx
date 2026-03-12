@@ -11,7 +11,7 @@ const FEATURES = [
   { icon: 'people', title: 'Unlimited Care Recipients', free: `${FREE_LIMITS.careRecipients} profile`, premium: 'Unlimited' },
   { icon: 'search', title: 'AI Resource Finder', free: `${FREE_LIMITS.aiQueriesPerMonth}/month`, premium: 'Unlimited' },
   { icon: 'document-text', title: 'PDF Reports', free: `${FREE_LIMITS.pdfExportsPerMonth}/month`, premium: 'Unlimited' },
-  { icon: 'person-add', title: 'Care Team Invites', free: `${FREE_LIMITS.careTeamInvites} total`, premium: 'Unlimited' },
+  { icon: 'person-add', title: 'Care Team Invites', free: `${FREE_LIMITS.careTeamInvites} invite`, premium: 'Unlimited' },
   { icon: 'medical', title: 'Drug Interaction Checker', free: 'Limited', premium: 'Full Access' },
   { icon: 'cloud-upload', title: 'Cloud Backup', free: 'Basic', premium: 'Priority Sync' },
 ];
