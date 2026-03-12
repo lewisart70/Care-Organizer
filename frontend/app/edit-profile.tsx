@@ -44,18 +44,34 @@ export default function EditProfileScreen() {
   }, [selectedRecipientId]));
 
   const handleSave = async () => {
-    if (!form.name.trim()) { Alert.alert('Required', 'Name is required'); return; }
+    if (!form.name.trim()) { 
+      Alert.alert('Required', 'Name is required'); 
+      return; 
+    }
     setSaving(true);
     try {
-      await api.put(`/care-recipients/${selectedRecipientId}`, {
+      const payload = {
         ...form,
         medical_conditions: conditions ? conditions.split(',').map(s => s.trim()).filter(Boolean) : [],
         allergies: allergies ? allergies.split(',').map(s => s.trim()).filter(Boolean) : [],
         interests: interests ? interests.split(',').map(s => s.trim()).filter(Boolean) : [],
         favorite_foods: favoriteFoods ? favoriteFoods.split(',').map(s => s.trim()).filter(Boolean) : [],
-      });
-      router.back();
-    } catch (e: any) { Alert.alert('Error', e.message); } finally { setSaving(false); }
+      };
+      console.log('Saving profile with payload:', JSON.stringify(payload));
+      await api.put(`/care-recipients/${selectedRecipientId}`, payload);
+      console.log('Profile saved successfully, navigating back...');
+      setSaving(false);
+      // Use dismiss() for modal screens - more reliable than back()
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)/profile');
+      }
+    } catch (e: any) { 
+      console.error('Error saving profile:', e);
+      setSaving(false);
+      Alert.alert('Error', e.message || 'Failed to save profile'); 
+    }
   };
 
   if (loading) return <SafeAreaView style={s.container}><View style={s.centered}><ActivityIndicator size="large" color={COLORS.primary} /></View></SafeAreaView>;
@@ -63,7 +79,7 @@ export default function EditProfileScreen() {
   return (
     <SafeAreaView style={s.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <View style={s.header}><TouchableOpacity testID="close-edit" onPress={() => router.back()}><Ionicons name="close" size={28} color={COLORS.textPrimary} /></TouchableOpacity><Text style={s.headerTitle}>Edit Profile</Text>
+        <View style={s.header}><TouchableOpacity testID="close-edit" onPress={() => { console.log('Close button pressed'); if (router.canGoBack()) { router.back(); } else { router.replace('/(tabs)/profile'); } }}><Ionicons name="close" size={28} color={COLORS.textPrimary} /></TouchableOpacity><Text style={s.headerTitle}>Edit Profile</Text>
           <TouchableOpacity testID="save-edit-btn" onPress={handleSave} disabled={saving}>{saving ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Text style={s.saveText}>Save</Text>}</TouchableOpacity></View>
         <ScrollView style={s.body} keyboardShouldPersistTaps="handled">
           {[{ k: 'name', l: 'Full Name *', p: 'Name' },{ k: 'date_of_birth', l: 'Date of Birth', p: 'YYYY-MM-DD' },{ k: 'gender', l: 'Gender', p: 'Gender' },{ k: 'phone', l: 'Phone', p: 'Phone' },{ k: 'address', l: 'Address', p: 'Address' },{ k: 'blood_type', l: 'Blood Type', p: 'e.g., O+' },{ k: 'weight', l: 'Weight', p: 'e.g., 150 lbs' },{ k: 'health_card_number', l: 'Health Card #', p: 'Number' },{ k: 'insurance_info', l: 'Insurance', p: 'Insurance info' }].map(({ k, l, p }) => (

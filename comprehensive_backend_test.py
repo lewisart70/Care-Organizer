@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import uuid
 
 # Use the correct backend URL from frontend .env
-BACKEND_URL = "https://family-health-hub-23.preview.emergentagent.com/api"
+BACKEND_URL = "https://profile-nav-fix-3.preview.emergentagent.com/api"
 
 class FamilyCareBackendTest:
     def __init__(self):
