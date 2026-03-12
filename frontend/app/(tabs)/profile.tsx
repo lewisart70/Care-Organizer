@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Image, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Image, Alert, Modal, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +15,7 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
 
   const loadProfile = useCallback(async () => {
     if (!selectedRecipientId) { setLoading(false); return; }
@@ -78,11 +79,25 @@ export default function ProfileScreen() {
   };
 
   const showPhotoOptions = () => {
-    Alert.alert('Change Profile Picture', 'Choose an option', [
-      { text: 'Take Photo', onPress: takePhoto },
-      { text: 'Choose from Library', onPress: pickImage },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    if (Platform.OS === 'web') {
+      // Use modal for web since Alert.alert doesn't work properly
+      setShowPhotoModal(true);
+    } else {
+      Alert.alert('Change Profile Picture', 'Choose an option', [
+        { text: 'Take Photo', onPress: takePhoto },
+        { text: 'Choose from Library', onPress: pickImage },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    }
+  };
+
+  const handlePhotoOption = (option: 'camera' | 'library') => {
+    setShowPhotoModal(false);
+    if (option === 'camera') {
+      takePhoto();
+    } else {
+      pickImage();
+    }
   };
 
   const calculateAge = (dateOfBirth: string) => {
@@ -275,6 +290,48 @@ export default function ProfileScreen() {
 
         <View style={{ height: SPACING.xxxl }} />
       </ScrollView>
+
+      {/* Photo Options Modal for Web */}
+      <Modal visible={showPhotoModal} transparent animationType="fade">
+        <View style={styles.photoModalOverlay}>
+          <View style={styles.photoModalContent}>
+            <Text style={styles.photoModalTitle}>Change Profile Picture</Text>
+            <Text style={styles.photoModalSubtitle}>Choose an option</Text>
+            
+            <TouchableOpacity 
+              style={styles.photoModalOption} 
+              onPress={() => handlePhotoOption('camera')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.photoModalIcon, { backgroundColor: COLORS.primaryLight }]}>
+                <Ionicons name="camera" size={24} color={COLORS.primary} />
+              </View>
+              <Text style={styles.photoModalOptionText}>Take Photo</Text>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.photoModalOption} 
+              onPress={() => handlePhotoOption('library')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.photoModalIcon, { backgroundColor: COLORS.secondaryLight }]}>
+                <Ionicons name="images" size={24} color={COLORS.secondary} />
+              </View>
+              <Text style={styles.photoModalOptionText}>Choose from Library</Text>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.photoModalCancel} 
+              onPress={() => setShowPhotoModal(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.photoModalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -566,5 +623,65 @@ const styles = StyleSheet.create({
     color: COLORS.white, 
     fontWeight: '700', 
     fontSize: FONT_SIZES.md,
+  },
+
+  // Photo Modal Styles
+  photoModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  photoModalContent: {
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: RADIUS.xxl,
+    borderTopRightRadius: RADIUS.xxl,
+    padding: SPACING.xl,
+    paddingBottom: SPACING.xxxl,
+  },
+  photoModalTitle: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    marginBottom: SPACING.xs,
+  },
+  photoModalSubtitle: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: SPACING.xl,
+  },
+  photoModalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.lg,
+    marginBottom: SPACING.sm,
+  },
+  photoModalIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING.md,
+  },
+  photoModalOptionText: {
+    flex: 1,
+    fontSize: FONT_SIZES.md,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  photoModalCancel: {
+    paddingVertical: SPACING.md,
+    marginTop: SPACING.sm,
+  },
+  photoModalCancelText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    textAlign: 'center',
   },
 });
