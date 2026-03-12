@@ -61,12 +61,8 @@ export default function EditProfileScreen() {
       await api.put(`/care-recipients/${selectedRecipientId}`, payload);
       console.log('Profile saved successfully, navigating back...');
       setSaving(false);
-      // Use dismiss() for modal screens - more reliable than back()
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace('/(tabs)/profile');
-      }
+      // Use dismiss() for modal screens as configured in _layout.tsx
+      router.dismiss();
     } catch (e: any) { 
       console.error('Error saving profile:', e);
       setSaving(false);
@@ -79,7 +75,7 @@ export default function EditProfileScreen() {
   return (
     <SafeAreaView style={s.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <View style={s.header}><TouchableOpacity testID="close-edit" onPress={() => { console.log('Close button pressed'); if (router.canGoBack()) { router.back(); } else { router.replace('/(tabs)/profile'); } }}><Ionicons name="close" size={28} color={COLORS.textPrimary} /></TouchableOpacity><Text style={s.headerTitle}>Edit Profile</Text>
+        <View style={s.header}><TouchableOpacity testID="close-edit" onPress={() => { console.log('Close button pressed'); router.dismiss(); }}><Ionicons name="close" size={28} color={COLORS.textPrimary} /></TouchableOpacity><Text style={s.headerTitle}>Edit Profile</Text>
           <TouchableOpacity testID="save-edit-btn" onPress={handleSave} disabled={saving}>{saving ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Text style={s.saveText}>Save</Text>}</TouchableOpacity></View>
         <ScrollView style={s.body} keyboardShouldPersistTaps="handled">
           {[{ k: 'name', l: 'Full Name *', p: 'Name' },{ k: 'date_of_birth', l: 'Date of Birth', p: 'YYYY-MM-DD' },{ k: 'gender', l: 'Gender', p: 'Gender' },{ k: 'phone', l: 'Phone', p: 'Phone' },{ k: 'address', l: 'Address', p: 'Address' },{ k: 'blood_type', l: 'Blood Type', p: 'e.g., O+' },{ k: 'weight', l: 'Weight', p: 'e.g., 150 lbs' },{ k: 'health_card_number', l: 'Health Card #', p: 'Number' },{ k: 'insurance_info', l: 'Insurance', p: 'Insurance info' }].map(({ k, l, p }) => (
