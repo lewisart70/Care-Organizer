@@ -7,7 +7,7 @@ import base64
 from datetime import datetime
 
 # Use the correct backend URL from frontend .env
-BACKEND_URL = "https://profile-nav-fix-3.preview.emergentagent.com/api"
+BACKEND_URL = "https://family-care-check.preview.emergentagent.com/api"
 
 class ExportReportTestRunner:
     def __init__(self):

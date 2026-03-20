@@ -1,4 +1,4 @@
-const BACKEND_URL = 'https://profile-nav-fix-3.preview.emergentagent.com';
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
 class ApiClient {
   private token: string | null = null;
@@ -29,7 +29,6 @@ class ApiClient {
     const res = await fetch(`${BACKEND_URL}/api${path}`, {
       method: 'GET',
       headers: this.getHeaders(),
-      credentials: 'include',
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Request failed' }));
@@ -42,7 +41,6 @@ class ApiClient {
     const res = await fetch(`${BACKEND_URL}/api${path}`, {
       method: 'POST',
       headers: this.getHeaders(),
-      credentials: 'include',
       body: body ? JSON.stringify(body) : undefined,
     });
     if (!res.ok) {
@@ -56,7 +54,6 @@ class ApiClient {
     const res = await fetch(`${BACKEND_URL}/api${path}`, {
       method: 'PUT',
       headers: this.getHeaders(),
-      credentials: 'include',
       body: body ? JSON.stringify(body) : undefined,
     });
     if (!res.ok) {
@@ -70,7 +67,6 @@ class ApiClient {
     const res = await fetch(`${BACKEND_URL}/api${path}`, {
       method: 'PATCH',
       headers: this.getHeaders(),
-      credentials: 'include',
       body: body ? JSON.stringify(body) : undefined,
     });
     if (!res.ok) {
@@ -84,7 +80,6 @@ class ApiClient {
     const res = await fetch(`${BACKEND_URL}/api${path}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
-      credentials: 'include',
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Request failed' }));
