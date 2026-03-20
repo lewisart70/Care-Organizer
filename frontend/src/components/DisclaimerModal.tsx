@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
-  View, Text, TouchableOpacity, StyleSheet, ScrollView, 
-  Modal, ActivityIndicator, Alert
+  View, Text, Pressable, StyleSheet, ScrollView, 
+  Modal, ActivityIndicator, Alert, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,19 +16,34 @@ interface DisclaimerModalProps {
 export default function DisclaimerModal({ visible, onAccept }: DisclaimerModalProps) {
   const [checked, setChecked] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleAccept = async () => {
+    console.log('handleAccept called, checked:', checked);
+    setError('');
+    
     if (!checked) {
-      Alert.alert('Required', 'Please check the box to confirm you have read and agree to the terms.');
+      const msg = 'Please check the box to confirm you have read and agree to the terms.';
+      setError(msg);
+      if (Platform.OS !== 'web') {
+        Alert.alert('Required', msg);
+      }
       return;
     }
 
     setLoading(true);
     try {
+      console.log('Calling accept-disclaimer API...');
       await api.post('/auth/accept-disclaimer');
+      console.log('API call successful, calling onAccept');
       onAccept();
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to accept disclaimer');
+      console.log('API error:', e);
+      const errMsg = e.message || 'Failed to accept disclaimer';
+      setError(errMsg);
+      if (Platform.OS !== 'web') {
+        Alert.alert('Error', errMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -121,11 +136,25 @@ export default function DisclaimerModal({ visible, onAccept }: DisclaimerModalPr
             </View>
           </View>
 
+          {/* Error message */}
+          {error ? (
+            <View style={styles.errorContainer}>
+              <Ionicons name="alert-circle" size={16} color={COLORS.error} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
           {/* Checkbox */}
-          <TouchableOpacity 
-            style={styles.checkboxContainer} 
-            onPress={() => setChecked(!checked)}
-            activeOpacity={0.7}
+          <Pressable 
+            style={({ pressed }) => [
+              styles.checkboxContainer,
+              pressed && { opacity: 0.7 }
+            ]} 
+            onPress={() => {
+              console.log('Checkbox pressed, current value:', checked);
+              setChecked(!checked);
+              setError('');
+            }}
           >
             <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
               {checked && <Ionicons name="checkmark" size={18} color={COLORS.white} />}
@@ -133,23 +162,29 @@ export default function DisclaimerModal({ visible, onAccept }: DisclaimerModalPr
             <Text style={styles.checkboxLabel}>
               I have read and agree to the privacy and security guidelines. I understand my responsibilities as a caregiver using this app.
             </Text>
-          </TouchableOpacity>
+          </Pressable>
 
           {/* Accept Button */}
-          <TouchableOpacity 
-            style={[styles.acceptButton, !checked && styles.acceptButtonDisabled]}
+          <Pressable 
+            style={({ pressed }) => [
+              styles.acceptButton, 
+              !checked && styles.acceptButtonDisabled,
+              pressed && checked && { opacity: 0.8 }
+            ]}
             onPress={handleAccept}
-            disabled={loading || !checked}
+            disabled={loading}
           >
             {loading ? (
               <ActivityIndicator color={COLORS.white} />
             ) : (
               <>
-                <Text style={styles.acceptButtonText}>I Agree - Continue</Text>
-                <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
+                <Text style={styles.acceptButtonText}>
+                  {checked ? 'I Agree - Continue' : 'Check the box above to continue'}
+                </Text>
+                {checked && <Ionicons name="arrow-forward" size={20} color={COLORS.white} />}
               </>
             )}
-          </TouchableOpacity>
+          </Pressable>
 
           <View style={{ height: SPACING.xxl }} />
         </ScrollView>
@@ -238,6 +273,22 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm, 
     color: COLORS.textPrimary, 
     lineHeight: 22,
+    fontWeight: '500',
+  },
+  
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.error + '15',
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginTop: SPACING.md,
+    gap: SPACING.sm,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.error,
     fontWeight: '500',
   },
   
