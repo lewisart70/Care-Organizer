@@ -499,6 +499,82 @@ async def login(data: UserLogin):
         }
     }
 
+class AppleAuthRequest(BaseModel):
+    user_id: str  # Apple's unique user identifier
+    email: Optional[str] = None
+    full_name: Optional[str] = None
+    identity_token: Optional[str] = None  # For backend verification (optional)
+
+@api_router.post("/auth/apple")
+async def apple_auth(data: AppleAuthRequest):
+    """
+    Authenticate user with Apple Sign-In credentials.
+    Apple only provides email/name on FIRST sign-in, so we store it.
+    """
+    # Use Apple user ID as unique identifier
+    apple_user_id = data.user_id
+    
+    # Check if user already exists (by Apple ID stored in metadata)
+    existing = await db.users.find_one({"apple_user_id": apple_user_id}, {"_id": 0})
+    
+    if existing:
+        # Returning user - use stored info
+        user_id = existing["user_id"]
+        disclaimer_accepted = existing.get("disclaimer_accepted", False)
+        token = create_token(user_id, existing["email"])
+        return {
+            "token": token,
+            "user": {
+                "user_id": user_id,
+                "email": existing["email"],
+                "name": existing["name"],
+                "picture": existing.get("picture"),
+                "disclaimer_accepted": disclaimer_accepted
+            }
+        }
+    else:
+        # New user - create account
+        # Apple only provides email on first sign-in
+        email = data.email or f"{apple_user_id}@privaterelay.appleid.com"
+        name = data.full_name or "Apple User"
+        
+        # Check if email already exists (user might have registered with email first)
+        existing_email = await db.users.find_one({"email": email}, {"_id": 0})
+        if existing_email:
+            # Link Apple ID to existing account
+            await db.users.update_one(
+                {"email": email},
+                {"$set": {"apple_user_id": apple_user_id}}
+            )
+            user_id = existing_email["user_id"]
+            disclaimer_accepted = existing_email.get("disclaimer_accepted", False)
+        else:
+            # Create new user
+            user_id = f"user_{uuid.uuid4().hex[:12]}"
+            await db.users.insert_one({
+                "user_id": user_id,
+                "apple_user_id": apple_user_id,
+                "email": email,
+                "name": name,
+                "picture": None,
+                "disclaimer_accepted": False,
+                "disclaimer_accepted_at": None,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+            disclaimer_accepted = False
+        
+        token = create_token(user_id, email)
+        return {
+            "token": token,
+            "user": {
+                "user_id": user_id,
+                "email": email,
+                "name": name,
+                "picture": None,
+                "disclaimer_accepted": disclaimer_accepted
+            }
+        }
+
 @api_router.post("/auth/google")
 async def google_auth(request: Request):
     body = await request.json()

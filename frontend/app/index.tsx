@@ -12,7 +12,7 @@ import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../src/constants/theme';
 import { Logo } from '../src/components/Logo';
 
 export default function LoginScreen() {
-  const { user, isLoading, login, loginWithGoogle } = useAuth();
+  const { user, isLoading, login, loginWithApple } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -72,22 +72,20 @@ export default function LoginScreen() {
       });
 
       // Get user info from credential
-      const name = credential.fullName
+      // Note: Apple only provides email/name on FIRST sign-in
+      const fullName = credential.fullName
         ? `${credential.fullName.givenName || ''} ${credential.fullName.familyName || ''}`.trim()
-        : 'Apple User';
-      const userEmail = credential.email || `${credential.user}@privaterelay.appleid.com`;
+        : undefined;
 
-      // Create/login user with Apple credentials
-      // For now, we'll use the Apple user ID as a unique identifier
-      // In production, you'd verify the identityToken on the backend
-      
-      // Store Apple auth info and navigate
-      // Using the existing auth context pattern
-      Alert.alert(
-        'Apple Sign-In Success',
-        `Welcome ${name}! Apple Sign-In is configured and ready. For full functionality, deploy to the App Store.`,
-        [{ text: 'OK' }]
+      // Use AuthContext to login with Apple
+      await loginWithApple(
+        credential.user,
+        credential.email || undefined,
+        fullName || undefined
       );
+      
+      // Navigate to home
+      router.replace('/(tabs)/home');
       
     } catch (error: any) {
       if (error.code === 'ERR_REQUEST_CANCELED') {
@@ -95,7 +93,7 @@ export default function LoginScreen() {
         console.log('User cancelled Apple Sign-In');
       } else {
         console.error('Apple Sign-In error:', error);
-        setError('Apple Sign-In failed. Please try again.');
+        setError(error.message || 'Apple Sign-In failed. Please try again.');
       }
     } finally {
       setLoading(false);

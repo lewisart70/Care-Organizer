@@ -21,6 +21,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   loginWithGoogle: (sessionId: string) => Promise<void>;
+  loginWithApple: (appleUserId: string, email?: string, fullName?: string) => Promise<void>;
   logout: () => Promise<void>;
   setSelectedRecipientId: (id: string | null) => void;
   setIsProfileOwner: (isOwner: boolean) => void;
@@ -37,6 +38,7 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => {},
   register: async () => {},
   loginWithGoogle: async () => {},
+  loginWithApple: async () => {},
   logout: async () => {},
   setSelectedRecipientId: () => {},
   setIsProfileOwner: () => {},
@@ -139,6 +141,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const loginWithApple = useCallback(async (appleUserId: string, email?: string, fullName?: string) => {
+    const res = await api.post('/auth/apple', { 
+      user_id: appleUserId, 
+      email: email,
+      full_name: fullName 
+    });
+    setToken(res.token);
+    setUser(res.user);
+    api.setToken(res.token);
+    await AsyncStorage.setItem('auth_token', res.token);
+    
+    // Check if disclaimer needs to be shown
+    const accepted = res.user.disclaimer_accepted || false;
+    setDisclaimerAccepted(accepted);
+    if (!accepted) {
+      setShowDisclaimerModal(true);
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout');
@@ -164,7 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user, token, isLoading, selectedRecipientId, disclaimerAccepted, isProfileOwner,
-      login, register, loginWithGoogle, logout,
+      login, register, loginWithGoogle, loginWithApple, logout,
       setSelectedRecipientId: handleSetRecipientId,
       setIsProfileOwner,
       acceptDisclaimer,
