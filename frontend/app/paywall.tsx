@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Platform, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSubscription, FREE_LIMITS } from '../src/context/SubscriptionContext';
 import { COLORS, SPACING, FONT_SIZES, RADIUS, SHADOWS } from '../src/constants/theme';
 import { PurchasesPackage } from 'react-native-purchases';
+
+// Required links for App Store compliance
+const PRIVACY_POLICY_URL = 'https://familycareorganizer.com/privacy';
+const TERMS_OF_USE_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 
 const FEATURES = [
   { icon: 'people', title: 'Unlimited Care Recipients', free: `${FREE_LIMITS.careRecipients} profile`, premium: 'Unlimited' },
@@ -226,11 +230,39 @@ export default function PaywallScreen() {
           )}
         </TouchableOpacity>
 
-        {/* Terms */}
-        <Text style={styles.terms}>
-          By subscribing, you agree to our Terms of Service and Privacy Policy. 
-          Subscriptions auto-renew unless cancelled at least 24 hours before the end of the current period.
-        </Text>
+        {/* Subscription Terms - Required by App Store */}
+        <View style={styles.termsSection}>
+          <Text style={styles.termsTitle}>Subscription Details</Text>
+          <Text style={styles.termsDetail}>
+            • <Text style={styles.termsBold}>Family Care Premium</Text> - Auto-renewable subscription
+          </Text>
+          <Text style={styles.termsDetail}>
+            • <Text style={styles.termsBold}>Duration:</Text> Monthly or Yearly plans available
+          </Text>
+          <Text style={styles.termsDetail}>
+            • <Text style={styles.termsBold}>Price:</Text> {selectedPackage?.product.priceString || 'See plan options above'} per {selectedPackage?.packageType === 'ANNUAL' ? 'year' : 'month'}
+          </Text>
+          <Text style={styles.termsDetail}>
+            • Payment will be charged to your Apple ID account at confirmation of purchase
+          </Text>
+          <Text style={styles.termsDetail}>
+            • Subscription automatically renews unless cancelled at least 24 hours before the end of the current period
+          </Text>
+          <Text style={styles.termsDetail}>
+            • You can manage and cancel subscriptions in your Apple ID Account Settings
+          </Text>
+        </View>
+
+        {/* Legal Links - Required by App Store */}
+        <View style={styles.legalLinks}>
+          <TouchableOpacity onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
+            <Text style={styles.legalLink}>Privacy Policy</Text>
+          </TouchableOpacity>
+          <Text style={styles.legalSeparator}>•</Text>
+          <TouchableOpacity onPress={() => Linking.openURL(TERMS_OF_USE_URL)}>
+            <Text style={styles.legalLink}>Terms of Use</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={{ height: SPACING.xxl }} />
       </ScrollView>
@@ -344,6 +376,48 @@ const styles = StyleSheet.create({
   terms: {
     fontSize: FONT_SIZES.xs, color: COLORS.textMuted,
     textAlign: 'center', paddingHorizontal: SPACING.xl, lineHeight: 16,
+  },
+  termsSection: {
+    marginHorizontal: SPACING.xl,
+    marginTop: SPACING.md,
+    padding: SPACING.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  termsTitle: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.sm,
+  },
+  termsDetail: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    lineHeight: 18,
+    marginBottom: 4,
+  },
+  termsBold: {
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  legalLinks: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: SPACING.lg,
+    gap: SPACING.sm,
+  },
+  legalLink: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  legalSeparator: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textMuted,
   },
 
   // Subscribed state
