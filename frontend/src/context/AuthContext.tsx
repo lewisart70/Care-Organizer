@@ -20,7 +20,7 @@ interface AuthContextType {
   isProfileOwner: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
-  loginWithGoogle: (sessionId: string) => Promise<void>;
+  loginWithGoogle: (googleUserId: string, email: string, name: string, picture?: string) => Promise<void>;
   loginWithApple: (appleUserId: string, email?: string, fullName?: string) => Promise<void>;
   logout: () => Promise<void>;
   setSelectedRecipientId: (id: string | null) => void;
@@ -126,8 +126,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setShowDisclaimerModal(true);
   }, []);
 
-  const loginWithGoogle = useCallback(async (sessionId: string) => {
-    const res = await api.post('/auth/google', { session_id: sessionId });
+  const loginWithGoogle = useCallback(async (googleUserId: string, email: string, name: string, picture?: string) => {
+    const res = await api.post('/auth/google', { 
+      google_user_id: googleUserId,
+      email: email,
+      name: name,
+      picture: picture
+    });
     setToken(res.token);
     setUser(res.user);
     api.setToken(res.token);

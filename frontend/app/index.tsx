@@ -7,12 +7,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '../src/context/AuthContext';
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../src/constants/theme';
 import { Logo } from '../src/components/Logo';
 
+// Google OAuth Client ID for iOS
+const GOOGLE_IOS_CLIENT_ID = '477062471666-2a4df0o10g8b4fkh9asstlln7mpo93h1.apps.googleusercontent.com';
+
+WebBrowser.maybeCompleteAuthSession();
+
 export default function LoginScreen() {
-  const { user, isLoading, login, loginWithApple } = useAuth();
+  const { user, isLoading, login, loginWithApple, loginWithGoogle } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,6 +27,12 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [appleAuthAvailable, setAppleAuthAvailable] = useState(false);
+
+  // Google Sign-In configuration
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    iosClientId: GOOGLE_IOS_CLIENT_ID,
+    scopes: ['profile', 'email'],
+  });
 
   useEffect(() => {
     if (!isLoading && user) {
@@ -31,6 +44,39 @@ export default function LoginScreen() {
     // Check if Apple Sign-In is available (iOS only)
     AppleAuthentication.isAvailableAsync().then(setAppleAuthAvailable);
   }, []);
+
+  // Handle Google Sign-In response
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { authentication } = response;
+      if (authentication?.accessToken) {
+        handleGoogleLogin(authentication.accessToken);
+      }
+    }
+  }, [response]);
+
+  const handleGoogleLogin = async (accessToken: string) => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Fetch user info from Google
+      const userInfoResponse = await fetch('https://www.googleapis.com/userinfo/v2/me', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const userInfo = await userInfoResponse.json();
+      
+      // Login with Google credentials via our backend
+      await loginWithGoogle(userInfo.id, userInfo.email, userInfo.name, userInfo.picture);
+      
+      router.replace('/(tabs)/home');
+    } catch (e: any) {
+      console.error('Google login error:', e);
+      setError(e.message || 'Google Sign-In failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -50,13 +96,8 @@ export default function LoginScreen() {
   };
 
   const handleGoogleAuth = () => {
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    const redirectUrl = typeof window !== 'undefined'
-      ? window.location.origin + '/google-callback'
-      : '';
-    if (typeof window !== 'undefined') {
-      window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
-    }
+    // Use expo-auth-session for Google Sign-In
+    promptAsync();
   };
 
   const handleAppleSignIn = async () => {

@@ -19,7 +19,14 @@
         "NSPhotoLibraryUsageDescription": "Choose profile photos from your library for care recipient identification",
         "NSHealthShareUsageDescription": "Share health data to help coordinate care for your loved ones",
         "NSHealthUpdateUsageDescription": "Update health records to maintain accurate care information",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.477062471666-2a4df0o10g8b4fkh9asstlln7mpo93h1"
+            ]
+          }
+        ]
       },
       "config": {
         "usesNonExemptEncryption": false

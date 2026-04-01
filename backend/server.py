@@ -578,9 +578,79 @@ async def apple_auth(data: AppleAuthRequest):
 @api_router.post("/auth/google")
 async def google_auth(request: Request):
     body = await request.json()
+    
+    # Support both old session-based auth and new direct Google OAuth
+    google_user_id = body.get("google_user_id")
+    email = body.get("email")
+    name = body.get("name")
+    picture = body.get("picture")
+    
+    # If using new direct Google OAuth
+    if google_user_id and email:
+        # Check if user exists by Google ID
+        existing = await db.users.find_one({"google_user_id": google_user_id}, {"_id": 0})
+        
+        if existing:
+            # Returning user
+            user_id = existing["user_id"]
+            await db.users.update_one(
+                {"user_id": user_id}, 
+                {"$set": {"name": name or existing["name"], "picture": picture or existing.get("picture")}}
+            )
+            disclaimer_accepted = existing.get("disclaimer_accepted", False)
+            token = create_token(user_id, existing["email"])
+            return {
+                "token": token,
+                "user": {
+                    "user_id": user_id,
+                    "email": existing["email"],
+                    "name": name or existing["name"],
+                    "picture": picture or existing.get("picture"),
+                    "disclaimer_accepted": disclaimer_accepted
+                }
+            }
+        else:
+            # Check if email exists (might have registered with email first)
+            existing_email = await db.users.find_one({"email": email}, {"_id": 0})
+            if existing_email:
+                # Link Google ID to existing account
+                await db.users.update_one(
+                    {"email": email},
+                    {"$set": {"google_user_id": google_user_id, "name": name or existing_email["name"], "picture": picture}}
+                )
+                user_id = existing_email["user_id"]
+                disclaimer_accepted = existing_email.get("disclaimer_accepted", False)
+            else:
+                # Create new user
+                user_id = f"user_{uuid.uuid4().hex[:12]}"
+                await db.users.insert_one({
+                    "user_id": user_id,
+                    "google_user_id": google_user_id,
+                    "email": email,
+                    "name": name or "Google User",
+                    "picture": picture,
+                    "disclaimer_accepted": False,
+                    "disclaimer_accepted_at": None,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                })
+                disclaimer_accepted = False
+            
+            token = create_token(user_id, email)
+            return {
+                "token": token,
+                "user": {
+                    "user_id": user_id,
+                    "email": email,
+                    "name": name or "Google User",
+                    "picture": picture,
+                    "disclaimer_accepted": disclaimer_accepted
+                }
+            }
+    
+    # Fallback to old session-based auth (for backwards compatibility)
     session_id = body.get("session_id")
     if not session_id:
-        raise HTTPException(status_code=400, detail="session_id required")
+        raise HTTPException(status_code=400, detail="google_user_id and email required, or session_id")
     async with httpx.AsyncClient() as http_client:
         resp = await http_client.get(
             "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
