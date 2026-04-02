@@ -3,6 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../utils/api';
 import DisclaimerModal from '../components/DisclaimerModal';
 
+// Debug logging for auth context
+const logAuth = (event: string, data?: any) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[AuthContext ${timestamp}] ${event}`, data ? JSON.stringify(data, null, 2) : '');
+};
+
 interface User {
   user_id: string;
   email: string;
@@ -100,17 +106,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const res = await api.post('/auth/login', { email, password });
-    setToken(res.token);
-    setUser(res.user);
-    api.setToken(res.token);
-    await AsyncStorage.setItem('auth_token', res.token);
-    
-    // Check if disclaimer needs to be shown
-    const accepted = res.user.disclaimer_accepted || false;
-    setDisclaimerAccepted(accepted);
-    if (!accepted) {
-      setShowDisclaimerModal(true);
+    logAuth('login called', { email });
+    try {
+      const res = await api.post('/auth/login', { email, password });
+      logAuth('login API response received', { 
+        hasToken: !!res.token, 
+        userId: res.user?.user_id,
+        email: res.user?.email 
+      });
+      
+      setToken(res.token);
+      setUser(res.user);
+      api.setToken(res.token);
+      await AsyncStorage.setItem('auth_token', res.token);
+      logAuth('login token stored in AsyncStorage');
+      
+      // Check if disclaimer needs to be shown
+      const accepted = res.user.disclaimer_accepted || false;
+      setDisclaimerAccepted(accepted);
+      if (!accepted) {
+        setShowDisclaimerModal(true);
+      }
+      logAuth('login complete', { disclaimerAccepted: accepted });
+    } catch (error: any) {
+      logAuth('login ERROR', { message: error.message });
+      throw error;
     }
   }, []);
 
@@ -147,21 +167,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loginWithApple = useCallback(async (appleUserId: string, email?: string, fullName?: string) => {
-    const res = await api.post('/auth/apple', { 
-      user_id: appleUserId, 
-      email: email,
-      full_name: fullName 
-    });
-    setToken(res.token);
-    setUser(res.user);
-    api.setToken(res.token);
-    await AsyncStorage.setItem('auth_token', res.token);
-    
-    // Check if disclaimer needs to be shown
-    const accepted = res.user.disclaimer_accepted || false;
-    setDisclaimerAccepted(accepted);
-    if (!accepted) {
-      setShowDisclaimerModal(true);
+    logAuth('loginWithApple called', { appleUserId: appleUserId?.substring(0, 10) + '...', email, fullName });
+    try {
+      const res = await api.post('/auth/apple', { 
+        user_id: appleUserId, 
+        email: email,
+        full_name: fullName 
+      });
+      logAuth('loginWithApple API response received', { 
+        hasToken: !!res.token, 
+        userId: res.user?.user_id,
+        email: res.user?.email 
+      });
+      
+      setToken(res.token);
+      setUser(res.user);
+      api.setToken(res.token);
+      await AsyncStorage.setItem('auth_token', res.token);
+      logAuth('loginWithApple token stored in AsyncStorage');
+      
+      // Check if disclaimer needs to be shown
+      const accepted = res.user.disclaimer_accepted || false;
+      setDisclaimerAccepted(accepted);
+      if (!accepted) {
+        setShowDisclaimerModal(true);
+      }
+      logAuth('loginWithApple complete', { disclaimerAccepted: accepted });
+    } catch (error: any) {
+      logAuth('loginWithApple ERROR', { 
+        message: error.message, 
+        code: error.code,
+        response: error.response?.data 
+      });
+      throw error;
     }
   }, []);
 

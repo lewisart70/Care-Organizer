@@ -2,7 +2,7 @@
   "expo": {
     "name": "Family Care Organizer",
     "slug": "family-care-organizer",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "familycareorganizer",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.familycareorganizer.app",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Record voice notes to document caregiving observations and daily care activities",

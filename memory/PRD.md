@@ -3,6 +3,23 @@
 ## Overview
 A comprehensive mobile app for families managing elder care, based on "The Family Care Organizer" book. Enables multiple caregivers to collaborate on managing care for elderly loved ones with features covering medical, daily, legal, and financial aspects.
 
+## Current Version
+- **App Version:** 1.0.1
+- **iOS Build Number:** 2
+- **Last Updated:** April 2, 2026
+
+## App Store Review Status
+- **Submission ID:** 9e32c0fc-31a5-4209-9dea-ae04b7efbf4e
+- **Review Date:** March 30, 2026
+- **Status:** Rejected (Guideline 2.1a - App Completeness)
+- **Issue:** After Sign in with Apple, app remained at login page OR showed error with demo account
+
+## Fixes Implemented (Build 2)
+1. **iPad-specific responsive design** - Added tablet-optimized layout with `useWindowDimensions`
+2. **Enhanced error logging** - Added comprehensive auth flow logging for debugging
+3. **Build number incremented** - Changed from "1" to "2"
+4. **Version updated** - Changed from "1.0.0" to "1.0.1"
+
 ## Tech Stack
 - **Frontend**: Expo (React Native) with Expo Router
 - **Backend**: FastAPI (Python)
