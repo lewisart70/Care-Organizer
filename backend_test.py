@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 
 # Use the correct backend URL from frontend .env
-BACKEND_URL = "https://family-care-check.preview.emergentagent.com/api"
+BACKEND_URL = "https://apple-review-check.preview.emergentagent.com/api"
 
 class FamilyCareOrganizerTestRunner:
     def __init__(self):
