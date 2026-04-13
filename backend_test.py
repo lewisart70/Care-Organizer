@@ -7,7 +7,7 @@ import base64
 import uuid
 from datetime import datetime
 
-# Use the correct backend URL from the agent context
+# Use the correct backend URL from agent context
 BACKEND_URL = "https://railway-recovery.preview.emergentagent.com/api"
 
 class FamilyCareOrganizerTestRunner:
@@ -275,7 +275,39 @@ class FamilyCareOrganizerTestRunner:
             self.log(f"❌ FAIL: Login error: {str(e)}")
             return False
     
-    def test_auth_logout(self):
+    def test_auth_login_empty_body(self):
+        """Test login with empty body - should return clear 422 error"""
+        self.log("Testing login with empty body...")
+        
+        try:
+            response = requests.post(f"{BACKEND_URL}/auth/login", json={})
+            self.log(f"Login empty body response status: {response.status_code}")
+            
+            if response.status_code == 422:
+                result = response.json()
+                detail = result.get("detail", "")
+                
+                # Handle both string and list formats
+                if isinstance(detail, list):
+                    detail = str(detail)
+                elif isinstance(detail, str):
+                    detail = detail
+                else:
+                    detail = str(detail)
+                
+                if detail and ("missing" in detail.lower() or "required" in detail.lower()):
+                    self.log(f"✅ PASS: Login correctly returned 422 with clear error: {detail}")
+                    return True
+                else:
+                    self.log(f"❌ FAIL: Login returned 422 but unclear error message: {detail}")
+                    return False
+            else:
+                self.log(f"❌ FAIL: Login with empty body should return 422, got {response.status_code}")
+                return False
+                
+        except Exception as e:
+            self.log(f"❌ FAIL: Login empty body error: {str(e)}")
+            return False
         """Test logout endpoint"""
         self.log("Testing logout...")
         
@@ -946,6 +978,7 @@ class FamilyCareOrganizerTestRunner:
             ("Apple Auth - Empty User ID", self.test_apple_auth_empty_user_id),
             ("Auth Register", self.test_auth_register),
             ("Auth Me", self.test_auth_me),
+            ("Login Empty Body", self.test_auth_login_empty_body),
             ("Google Auth", self.test_google_auth),
         ]
         

@@ -19,8 +19,7 @@ import httpx
 import json
 import base64
 import io
-from emergentintegrations.llm.openai import OpenAISpeechToText
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from openai import AsyncOpenAI
 import resend
 from passlib.context import CryptContext
 from reportlab.lib import colors
@@ -43,11 +42,14 @@ db = client[os.environ['DB_NAME']]
 
 JWT_SECRET = os.environ['JWT_SECRET_KEY']
 JWT_ALGORITHM = "HS256"
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', os.environ.get('EMERGENT_LLM_KEY', ''))
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
 DEMO_ACCOUNT_EMAIL = os.environ.get('DEMO_ACCOUNT_EMAIL', '')
 DEMO_ACCOUNT_PASSWORD = os.environ.get('DEMO_ACCOUNT_PASSWORD', '')
+
+# OpenAI client for AI features (STT, chat completions)
+openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 # Initialize Resend
 resend.api_key = RESEND_API_KEY
@@ -459,6 +461,32 @@ class ExportReportRequest(BaseModel):
     time_period: str  # "7_days" or "30_days"
     delivery_method: str  # "download", "email_self", "email_other"
     recipient_email: Optional[str] = None  # Required if delivery_method is "email_other"
+
+# ======================== AI HELPERS ========================
+
+async def ai_chat_completion(system_message: str, user_message: str, model: str = "gpt-4o-mini") -> str:
+    """Send a chat completion request to OpenAI and return the response text."""
+    if not openai_client:
+        raise HTTPException(status_code=500, detail="AI service not configured. Set OPENAI_API_KEY.")
+    response = await openai_client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message},
+        ],
+    )
+    return response.choices[0].message.content or ""
+
+def clean_json_response(text: str) -> str:
+    """Strip markdown code fences from an LLM JSON response."""
+    cleaned = text.strip()
+    if cleaned.startswith("```json"):
+        cleaned = cleaned[7:]
+    elif cleaned.startswith("```"):
+        cleaned = cleaned[3:]
+    if cleaned.endswith("```"):
+        cleaned = cleaned[:-3]
+    return cleaned.strip()
 
 # ======================== AUTH HELPERS ========================
 
@@ -1434,28 +1462,22 @@ async def delete_profile_photo(recipient_id: str, user: dict = Depends(get_curre
 @api_router.post("/transcribe")
 async def transcribe_audio(data: AudioTranscriptionRequest, user: dict = Depends(get_current_user)):
     """Convert voice recording to text using OpenAI Whisper API."""
+    if not openai_client:
+        raise HTTPException(status_code=500, detail="AI service not configured. Set OPENAI_API_KEY.")
     try:
-        # Decode base64 audio
-        # Expected format: data:audio/wav;base64,... or just the base64 string
         audio_data = data.audio_base64
         if ',' in audio_data:
             audio_data = audio_data.split(',')[1]
         
         audio_bytes = base64.b64decode(audio_data)
-        
-        # Create file-like object
         audio_file = io.BytesIO(audio_bytes)
         audio_file.name = "recording.wav"
         
-        # Initialize STT client
-        stt = OpenAISpeechToText(api_key=EMERGENT_LLM_KEY)
-        
-        # Transcribe
-        response = await stt.transcribe(
-            file=audio_file,
+        response = await openai_client.audio.transcriptions.create(
             model="whisper-1",
+            file=audio_file,
             response_format="json",
-            language=data.language
+            language=data.language,
         )
         
         return {"text": response.text, "success": True}
@@ -1468,8 +1490,6 @@ async def transcribe_audio(data: AudioTranscriptionRequest, user: dict = Depends
 async def summarize_appointment(data: SummarizeAppointmentRequest, user: dict = Depends(get_current_user)):
     """Use AI to summarize a doctor appointment transcript and extract key medical information."""
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        
         system_prompt = """You are a medical assistant helping caregivers understand doctor appointments.
 Analyze the appointment transcript and extract key information in a structured format.
 
@@ -1483,21 +1503,14 @@ Please provide:
 
 Be concise but thorough. If information is not mentioned in the transcript, indicate "Not discussed"."""
 
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"appointment_summary_{uuid.uuid4().hex[:8]}",
-            system_message=system_prompt
-        )
-        chat.with_model("openai", "gpt-4o-mini")
-
-        user_message = UserMessage(text=f"""Please summarize this doctor appointment recording:
+        user_msg = f"""Please summarize this doctor appointment recording:
 
 Appointment: {data.appointment_title or 'Doctor Visit'}
 
 Transcript:
-{data.transcript}""")
+{data.transcript}"""
 
-        response = await chat.send_message(user_message)
+        response = await ai_chat_completion(system_prompt, user_msg, model="gpt-4o-mini")
         
         return {
             "summary": response,
@@ -1930,25 +1943,12 @@ async def check_medication_interactions(data: MedicationInteractionRequest, user
     if len(data.medications) < 2:
         return {"interactions": [], "summary": "Need at least 2 medications to check interactions."}
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
         med_list = ", ".join(data.medications)
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"med_interaction_{uuid.uuid4().hex[:8]}",
-            system_message="You are a pharmaceutical expert assistant. You provide medication interaction information for caregivers. Always include a disclaimer that this is informational only and users should consult their pharmacist or doctor. Be concise and practical. Format your response as JSON with keys: 'interactions' (array of objects with 'medications', 'severity', 'description') and 'summary' (brief overall assessment)."
-        )
-        chat.with_model("openai", "gpt-4o-mini")
-        user_message = UserMessage(text=f"Check for potential drug interactions between these medications: {med_list}. Return the response as valid JSON.")
-        response = await chat.send_message(user_message)
-        import json
+        system_msg = "You are a pharmaceutical expert assistant. You provide medication interaction information for caregivers. Always include a disclaimer that this is informational only and users should consult their pharmacist or doctor. Be concise and practical. Format your response as JSON with keys: 'interactions' (array of objects with 'medications', 'severity', 'description') and 'summary' (brief overall assessment)."
+        user_msg = f"Check for potential drug interactions between these medications: {med_list}. Return the response as valid JSON."
+        response = await ai_chat_completion(system_msg, user_msg, model="gpt-4o-mini")
         try:
-            clean = response.strip()
-            if clean.startswith("```"):
-                clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
-                if clean.endswith("```"):
-                    clean = clean[:-3]
-                clean = clean.strip()
-            result = json.loads(clean)
+            result = json.loads(clean_json_response(response))
             return result
         except json.JSONDecodeError:
             return {"interactions": [], "summary": response, "raw": True}
@@ -1972,24 +1972,11 @@ Medications: {', '.join([m.get('name', '') + ' (' + m.get('dosage', '') + ')' fo
 Upcoming appointments: {', '.join([a.get('title', '') + ' on ' + a.get('date', '') for a in appts[:5]])}
 Recent incidents: {', '.join([i.get('description', '') for i in incidents[:3]])}"""
 
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"reminders_{uuid.uuid4().hex[:8]}",
-            system_message="You are a caring and knowledgeable elder care assistant. Generate helpful, practical reminders and suggestions for family caregivers based on the care recipient's profile. Be warm, supportive, and actionable. Return as JSON with key 'reminders' (array of objects with 'title', 'description', 'priority' (high/medium/low), 'category' (medication/health/safety/appointment/wellness))."
-        )
-        chat.with_model("openai", "gpt-4o-mini")
-        msg = UserMessage(text=f"Based on this care profile, generate 5-8 smart care reminders:\n{context}\nReturn as valid JSON.")
-        response = await chat.send_message(msg)
-        import json
+        system_msg = "You are a caring and knowledgeable elder care assistant. Generate helpful, practical reminders and suggestions for family caregivers based on the care recipient's profile. Be warm, supportive, and actionable. Return as JSON with key 'reminders' (array of objects with 'title', 'description', 'priority' (high/medium/low), 'category' (medication/health/safety/appointment/wellness))."
+        user_msg = f"Based on this care profile, generate 5-8 smart care reminders:\n{context}\nReturn as valid JSON."
+        response = await ai_chat_completion(system_msg, user_msg, model="gpt-4o-mini")
         try:
-            clean = response.strip()
-            if clean.startswith("```"):
-                clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
-                if clean.endswith("```"):
-                    clean = clean[:-3]
-                clean = clean.strip()
-            result = json.loads(clean)
+            result = json.loads(clean_json_response(response))
             return result
         except json.JSONDecodeError:
             return {"reminders": [{"title": "Care Tip", "description": response, "priority": "medium", "category": "wellness"}]}
@@ -2446,7 +2433,7 @@ async def search_caregiver_resources(data: ResourceSearchRequest, user: dict = D
     AI-powered search for caregiver support resources based on location and category.
     Uses GPT to find and format relevant local resources.
     """
-    if not EMERGENT_LLM_KEY:
+    if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="AI service not configured")
     
     category_description = RESOURCE_CATEGORIES.get(data.category, data.category)
@@ -2486,25 +2473,11 @@ Example format:
 ]"""
 
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"resource_search_{user['user_id']}_{uuid.uuid4().hex[:8]}",
-            system_message="You are a knowledgeable assistant that helps caregivers find support resources. Always provide accurate, real-world information about actual organizations and programs."
-        ).with_model("openai", "gpt-4o")
-        
-        user_message = UserMessage(text=search_prompt)
-        response = await chat.send_message(user_message)
+        system_msg = "You are a knowledgeable assistant that helps caregivers find support resources. Always provide accurate, real-world information about actual organizations and programs."
+        response = await ai_chat_completion(system_msg, search_prompt, model="gpt-4o")
         
         # Parse the JSON response
-        # Clean up the response - remove markdown code blocks if present
-        cleaned_response = response.strip()
-        if cleaned_response.startswith("```json"):
-            cleaned_response = cleaned_response[7:]
-        if cleaned_response.startswith("```"):
-            cleaned_response = cleaned_response[3:]
-        if cleaned_response.endswith("```"):
-            cleaned_response = cleaned_response[:-3]
-        cleaned_response = cleaned_response.strip()
+        cleaned_response = clean_json_response(response)
         
         resources = json.loads(cleaned_response)
         
