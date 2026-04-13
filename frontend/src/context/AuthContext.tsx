@@ -27,7 +27,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   loginWithGoogle: (googleUserId: string, email: string, name: string, picture?: string) => Promise<void>;
-  loginWithApple: (appleUserId: string, email?: string, fullName?: string) => Promise<void>;
+  loginWithApple: (appleUserId: string, email?: string, fullName?: string, identityToken?: string) => Promise<void>;
   logout: () => Promise<void>;
   setSelectedRecipientId: (id: string | null) => void;
   setIsProfileOwner: (isOwner: boolean) => void;
@@ -166,13 +166,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const loginWithApple = useCallback(async (appleUserId: string, email?: string, fullName?: string) => {
-    logAuth('loginWithApple called', { appleUserId: appleUserId?.substring(0, 10) + '...', email, fullName });
+  const loginWithApple = useCallback(async (appleUserId: string, email?: string, fullName?: string, identityToken?: string) => {
+    logAuth('loginWithApple called', { appleUserId: appleUserId?.substring(0, 10) + '...', email, fullName, hasIdentityToken: !!identityToken });
     try {
       const res = await api.post('/auth/apple', { 
         user_id: appleUserId, 
         email: email,
-        full_name: fullName 
+        full_name: fullName,
+        identity_token: identityToken || null
       });
       logAuth('loginWithApple API response received', { 
         hasToken: !!res.token, 

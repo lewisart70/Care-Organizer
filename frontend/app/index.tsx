@@ -140,7 +140,8 @@ export default function LoginScreen() {
       logAuthEvent('Apple credential received', { 
         hasUser: !!credential.user, 
         hasEmail: !!credential.email,
-        hasFullName: !!credential.fullName 
+        hasFullName: !!credential.fullName,
+        hasIdentityToken: !!credential.identityToken
       });
 
       // Get user info from credential
@@ -152,14 +153,16 @@ export default function LoginScreen() {
       logAuthEvent('Calling loginWithApple', { 
         userId: credential.user?.substring(0, 10) + '...', 
         email: credential.email,
-        fullName 
+        fullName,
+        hasIdentityToken: !!credential.identityToken
       });
 
-      // Use AuthContext to login with Apple
+      // Use AuthContext to login with Apple (includes identity token for server-side verification)
       await loginWithApple(
         credential.user,
         credential.email || undefined,
-        fullName || undefined
+        fullName || undefined,
+        credential.identityToken || undefined
       );
       
       logAuthEvent('Apple login successful, navigating to home');

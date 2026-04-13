@@ -462,6 +462,95 @@ class ExportReportRequest(BaseModel):
 
 # ======================== AUTH HELPERS ========================
 
+# Apple Sign-In token verification
+APPLE_PUBLIC_KEYS_URL = "https://appleid.apple.com/auth/keys"
+APPLE_ISSUER = "https://appleid.apple.com"
+APPLE_BUNDLE_ID = "com.familycareorganizer.app"
+_apple_keys_cache = {"keys": None, "fetched_at": None}
+
+async def fetch_apple_public_keys():
+    """Fetch and cache Apple's public keys for identity token verification."""
+    now = datetime.now(timezone.utc)
+    # Cache keys for 24 hours
+    if _apple_keys_cache["keys"] and _apple_keys_cache["fetched_at"]:
+        age = (now - _apple_keys_cache["fetched_at"]).total_seconds()
+        if age < 86400:
+            return _apple_keys_cache["keys"]
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(APPLE_PUBLIC_KEYS_URL, timeout=10)
+            resp.raise_for_status()
+            keys = resp.json().get("keys", [])
+            _apple_keys_cache["keys"] = keys
+            _apple_keys_cache["fetched_at"] = now
+            logger.info(f"Fetched {len(keys)} Apple public keys")
+            return keys
+    except Exception as e:
+        logger.error(f"Failed to fetch Apple public keys: {e}")
+        # Return cached keys if available, even if stale
+        if _apple_keys_cache["keys"]:
+            return _apple_keys_cache["keys"]
+        return []
+
+async def verify_apple_identity_token(identity_token: str) -> Optional[dict]:
+    """
+    Verify an Apple identity token (JWT) and return the decoded payload.
+    Returns None if verification fails or token is not provided.
+    """
+    if not identity_token:
+        return None
+    try:
+        from jwt.algorithms import RSAAlgorithm
+        # Get the key ID from the token header
+        unverified_header = jwt.get_unverified_header(identity_token)
+        kid = unverified_header.get("kid")
+        if not kid:
+            logger.warning("Apple identity token missing kid header")
+            return None
+        
+        # Fetch Apple's public keys
+        apple_keys = await fetch_apple_public_keys()
+        if not apple_keys:
+            logger.warning("No Apple public keys available for verification")
+            return None
+        
+        # Find the matching key
+        matching_key = None
+        for key in apple_keys:
+            if key.get("kid") == kid:
+                matching_key = key
+                break
+        
+        if not matching_key:
+            logger.warning(f"No matching Apple public key for kid: {kid}")
+            return None
+        
+        # Convert JWK to public key
+        public_key = RSAAlgorithm.from_jwk(json.dumps(matching_key))
+        
+        # Decode and verify the token
+        decoded = jwt.decode(
+            identity_token,
+            public_key,
+            algorithms=["RS256"],
+            audience=APPLE_BUNDLE_ID,
+            issuer=APPLE_ISSUER,
+        )
+        logger.info(f"Apple identity token verified successfully, sub: {decoded.get('sub', 'unknown')[:10]}...")
+        return decoded
+    except jwt.ExpiredSignatureError:
+        logger.warning("Apple identity token expired")
+        return None
+    except jwt.InvalidAudienceError:
+        logger.warning("Apple identity token audience mismatch")
+        return None
+    except jwt.InvalidIssuerError:
+        logger.warning("Apple identity token issuer mismatch")
+        return None
+    except Exception as e:
+        logger.warning(f"Apple identity token verification failed: {e}")
+        return None
+
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
@@ -579,8 +668,9 @@ async def apple_auth(data: AppleAuthRequest):
     """
     Authenticate user with Apple Sign-In credentials.
     Apple only provides email/name on FIRST sign-in, so we store it.
+    If identity_token is provided, it will be verified against Apple's public keys.
     """
-    logger.info(f"Apple auth attempt - user_id prefix: {data.user_id[:10] if data.user_id else 'NONE'}..., email: {data.email}, has_name: {bool(data.full_name)}")
+    logger.info(f"Apple auth attempt - user_id prefix: {data.user_id[:10] if data.user_id else 'NONE'}..., email: {data.email}, has_name: {bool(data.full_name)}, has_token: {bool(data.identity_token)}")
     
     if not data.user_id or not data.user_id.strip():
         logger.error("Apple auth failed - empty user_id")
@@ -588,6 +678,25 @@ async def apple_auth(data: AppleAuthRequest):
     
     # Use Apple user ID as unique identifier
     apple_user_id = data.user_id.strip()
+    
+    # Verify identity token if provided (enhances security)
+    verified_claims = None
+    if data.identity_token:
+        verified_claims = await verify_apple_identity_token(data.identity_token)
+        if verified_claims:
+            # Cross-check: the 'sub' claim in the token should match the user_id
+            token_sub = verified_claims.get("sub", "")
+            if token_sub != apple_user_id:
+                logger.warning(f"Apple auth - user_id mismatch: provided={apple_user_id[:10]}..., token_sub={token_sub[:10]}...")
+                raise HTTPException(status_code=401, detail="Apple authentication failed - user ID mismatch")
+            # Use email from verified token if available (more trustworthy)
+            if verified_claims.get("email") and not data.email:
+                data.email = verified_claims["email"]
+            logger.info("Apple identity token verified successfully")
+        else:
+            # Token was provided but couldn't be verified - log but don't block
+            # (token might be expired by the time it reaches backend)
+            logger.warning("Apple identity token provided but verification failed - proceeding with unverified auth")
     
     try:
         # Check if user already exists (by Apple ID stored in metadata)
@@ -607,7 +716,8 @@ async def apple_auth(data: AppleAuthRequest):
                     "name": existing["name"],
                     "picture": existing.get("picture"),
                     "disclaimer_accepted": disclaimer_accepted
-                }
+                },
+                "token_verified": verified_claims is not None
             }
         else:
             # New user - create account
@@ -651,7 +761,8 @@ async def apple_auth(data: AppleAuthRequest):
                     "name": name,
                     "picture": None,
                     "disclaimer_accepted": disclaimer_accepted
-                }
+                },
+                "token_verified": verified_claims is not None
             }
     except HTTPException:
         raise
