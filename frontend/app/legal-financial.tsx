@@ -7,6 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../src/context/AuthContext';
 import { api } from '../src/utils/api';
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../src/constants/theme';
+import LegalItemCard from '../src/components/legal-financial/LegalItemCard';
 
 const ITEM_TYPES = [
   { key: 'legal', label: 'Legal', icon: 'document-text', color: COLORS.info },
@@ -247,9 +248,6 @@ export default function LegalFinancialScreen() {
     setShowImageModal(true);
   };
 
-  const statusColor = (st: string) => st === 'completed' ? COLORS.success : st === 'in_progress' ? COLORS.warning : COLORS.textSecondary;
-  const getTypeInfo = (type: string) => ITEM_TYPES.find(t => t.key === type) || ITEM_TYPES[0];
-
   // Password prompt screen
   if (showPasswordPrompt && !isUnlocked) {
     return (
@@ -368,66 +366,15 @@ export default function LegalFinancialScreen() {
               <Text style={s.emptyText}>Add documents like insurance cards, wills, POA, etc.</Text>
             </View>
           ) :
-          items.map(item => {
-            const typeInfo = getTypeInfo(item.item_type);
-            return (
-              <TouchableOpacity 
-                key={item.item_id} 
-                style={s.card}
-                onPress={() => openEditModal(item)}
-                activeOpacity={0.7}
-              >
-                <View style={s.row}>
-                  <View style={[s.typeBadge, { backgroundColor: typeInfo.color + '15' }]}>
-                    <Ionicons name={typeInfo.icon as any} size={12} color={typeInfo.color} />
-                    <Text style={[s.typeText, { color: typeInfo.color }]}>{typeInfo.label}</Text>
-                  </View>
-                  <View style={s.cardActions}>
-                    <View style={[s.statusBadge, { backgroundColor: statusColor(item.status) + '15' }]}>
-                      <Text style={[s.statusText, { color: statusColor(item.status) }]}>
-                        {item.status?.replace('_', ' ')}
-                      </Text>
-                    </View>
-                    <TouchableOpacity style={s.actionBtn} onPress={() => openEditModal(item)}>
-                      <Ionicons name="pencil" size={16} color={COLORS.primary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={s.actionBtn} onPress={() => handleDelete(item.item_id, item.title)}>
-                      <Ionicons name="trash-outline" size={16} color={COLORS.error} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                
-                <Text style={s.cardTitle}>{item.title}</Text>
-                {item.description && <Text style={s.cardDesc}>{item.description}</Text>}
-                {item.contact_person && (
-                  <View style={s.detailRow}>
-                    <Ionicons name="person" size={12} color={COLORS.textSecondary} />
-                    <Text style={s.sub}>{item.contact_person}</Text>
-                  </View>
-                )}
-                {item.due_date && (
-                  <View style={s.detailRow}>
-                    <Ionicons name="calendar" size={12} color={COLORS.textSecondary} />
-                    <Text style={s.sub}>Due: {item.due_date}</Text>
-                  </View>
-                )}
-                
-                {item.image && (
-                  <TouchableOpacity style={s.imageThumbnailContainer} onPress={() => viewImage(item.image)}>
-                    <Image source={{ uri: item.image }} style={s.imageThumbnail} />
-                    <View style={s.imageOverlay}>
-                      <Ionicons name="expand" size={16} color={COLORS.white} />
-                      <Text style={s.imageOverlayText}>View Document</Text>
-                    </View>
-                  </TouchableOpacity>
-                )}
-                
-                <View style={s.editHint}>
-                  <Text style={s.editHintText}>Tap to edit</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+          items.map(item => (
+              <LegalItemCard
+                key={item.item_id}
+                item={item}
+                onEdit={openEditModal}
+                onDelete={handleDelete}
+                onViewImage={viewImage}
+              />
+            ))}
       </ScrollView>
 
       {/* Add/Edit Modal */}
