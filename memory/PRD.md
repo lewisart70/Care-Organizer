@@ -1,47 +1,53 @@
 # Family Care Organizer - PRD
 
 ## Original Problem Statement
-App rejected by Apple App Store (Guideline 2.1a - App Completeness) due to "Sign in with Apple" bug. 
-Backend is on Railway, reviewer on iPad Air 11-inch (M3) running iPadOS 26.4 couldn't sign in.
-Railway logs showed multiple 422 Unprocessable Entity errors on POST /api/auth/login.
+App rejected by Apple App Store (Guideline 2.1a) due to "Sign in with Apple" bug.
 
 ## Architecture
-- **Frontend**: React Native / Expo (mobile app for iOS & Android)
-- **Backend**: FastAPI (Python) deployed on Railway
-- **Database**: MongoDB (on Railway)
-- **Auth**: JWT tokens + Apple Sign-In (with identity token verification) + Google OAuth + Email/Password
+- **Frontend**: React Native / Expo (iOS & Android)
+- **Backend**: FastAPI on Railway + MongoDB
+- **Auth**: JWT + Apple Sign-In (with identity token verification) + Google OAuth + Email/Password
 
 ## What's Been Implemented (Apr 13, 2026)
 
-### Bug Fixes
-1. Added `/api/health` health check endpoint
-2. Added demo account auto-seeding on startup (DEMO_ACCOUNT_EMAIL/DEMO_ACCOUNT_PASSWORD env vars)
-3. Custom 422 validation error handler with clear messages
-4. Hardened Apple auth with input validation and logging
-5. Hardened email/password login with better error messages
-6. Auth flow logging on all endpoints
+### Session 1 - Auth Bug Fixes
+- Added `/api/health` health check endpoint
+- Added demo account auto-seeding on startup
+- Custom 422 validation error handler with clear messages
+- Hardened Apple auth with input validation, logging, error handling
+- Apple identity token JWT verification (RS256 via Apple public keys)
 
-### Enhancement: Apple Identity Token Verification
-- Backend fetches Apple's public keys from `https://appleid.apple.com/auth/keys` (cached 24h)
-- Verifies JWT identity token using RS256 against Apple's keys
-- Validates audience (`com.familycareorganizer.app`), issuer (`https://appleid.apple.com`), expiry
-- Cross-checks `sub` claim matches the provided `user_id`
-- **Graceful degradation**: If token verification fails, auth proceeds but logs a warning
-- Response includes `token_verified: true/false` field
-- Frontend updated to pass `credential.identityToken` to backend
+### Session 2 - Code Quality Fixes (from code review)
+**Critical:**
+- Fixed XSS vulnerability in `app/+html.tsx` — extracted static CSS to module constant
+- Fixed 41 missing React hook dependencies across AuthContext, SubscriptionContext, and app files
 
-### Files Modified
-- `backend/server.py` - All backend fixes and Apple token verification
-- `frontend/src/context/AuthContext.tsx` - Updated loginWithApple to pass identity token
-- `frontend/app/index.tsx` - Updated handleAppleSignIn to send identity token
+**Important:**
+- Added `useMemo` to AuthContext.Provider and SubscriptionContext.Provider values (prevents unnecessary re-renders)
+- Fixed 6 instances of index-as-key in lists (profile.tsx, nutrition.tsx, medication-checker.tsx, about-book.tsx, paywall.tsx, privacy-settings.tsx)
+- Removed stale closure risk by using functional updater in `acceptDisclaimer` (`setUser(prev => ...)`)
+- Converted `loadDataPolicy` to useCallback in privacy-settings.tsx
+
+### Files Modified (11 total)
+- `backend/server.py` — Auth hardening + Apple token verification
+- `frontend/src/context/AuthContext.tsx` — Hook deps, useMemo, extracted helper
+- `frontend/src/context/SubscriptionContext.tsx` — Hook deps, useMemo, cleanup
+- `frontend/app/+html.tsx` — XSS fix
+- `frontend/app/index.tsx` — Hook deps, identity token passthrough
+- `frontend/app/privacy-settings.tsx` — useCallback, key fix
+- `frontend/app/nutrition.tsx` — Key fix
+- `frontend/app/medication-checker.tsx` — Key fix
+- `frontend/app/about-book.tsx` — Key fix
+- `frontend/app/(tabs)/profile.tsx` — Key fixes (3)
+- `frontend/app/paywall.tsx` — Key fix
 
 ## Test Results
-- 13/13 backend auth tests passing (100%)
-- Health check, demo login, Apple auth (new/returning/empty/with-token), register, auth/me, Google auth
+- 7/7 backend auth tests passing (100%) after all code quality fixes
 
-## Prioritized Backlog
-- **P0**: Push all changes to GitHub -> Railway auto-deploys
+## Remaining Backlog
+- **P0**: Push changes to GitHub -> Railway auto-deploys
 - **P0**: Verify EXPO_PUBLIC_BACKEND_URL in EAS build config
-- **P1**: Fix app.json placeholder projectId/owner
+- **P1**: Extract large components into smaller sub-components (appointments: 610 lines, legal-financial: 591 lines)
+- **P1**: Remove 62 console.log statements before production
 - **P2**: Add rate limiting on auth endpoints
-- **P2**: Add Railway health check auto-restart config
+- **P2**: Increase TypeScript/Python type coverage
