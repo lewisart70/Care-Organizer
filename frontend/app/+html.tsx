@@ -2,6 +2,12 @@
 import { ScrollViewStyleReset } from "expo-router/html";
 import type { PropsWithChildren } from "react";
 
+// Static CSS string - defined at module level, not from user input, so safe to inline.
+// Using a constant avoids any injection risk while still using the required Expo HTML pattern.
+const STATIC_CSS = `body > div:first-child { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; }
+[role="tablist"] [role="tab"] * { overflow: visible !important; }
+[role="heading"], [role="heading"] * { overflow: visible !important; }`;
+
 export default function Root({ children }: PropsWithChildren) {
   return (
     <html lang="en" style={{ height: "100%" }}>
@@ -18,15 +24,8 @@ export default function Root({ children }: PropsWithChildren) {
           set `overflow: auto` on the body style below.
         */}
         <ScrollViewStyleReset />
-        <style
-          dangerouslySetInnerHTML={{
-            __html: `
-              body > div:first-child { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; }
-              [role="tablist"] [role="tab"] * { overflow: visible !important; }
-              [role="heading"], [role="heading"] * { overflow: visible !important; }
-            `,
-          }}
-        />
+        {/* eslint-disable-next-line react/no-danger -- Static CSS only, no user input */}
+        <style dangerouslySetInnerHTML={{ __html: STATIC_CSS }} />
       </head>
       <body
         style={{

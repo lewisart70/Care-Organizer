@@ -248,8 +248,8 @@ export default function ProfileScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Medical Conditions</Text>
             <View style={styles.tagContainer}>
-              {recipient.medical_conditions.map((c: string, i: number) => (
-                <View key={i} style={[styles.tag, { backgroundColor: COLORS.errorLight, borderColor: COLORS.error + '30' }]}>
+              {recipient.medical_conditions.map((c: string) => (
+                <View key={c} style={[styles.tag, { backgroundColor: COLORS.errorLight, borderColor: COLORS.error + '30' }]}>
                   <Ionicons name="medical" size={12} color={COLORS.error} />
                   <Text style={[styles.tagText, { color: COLORS.error }]}>{c}</Text>
                 </View>
@@ -263,8 +263,8 @@ export default function ProfileScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Allergies</Text>
             <View style={styles.tagContainer}>
-              {recipient.allergies.map((a: string, i: number) => (
-                <View key={i} style={[styles.tag, { backgroundColor: COLORS.warningLight, borderColor: COLORS.warning + '30' }]}>
+              {recipient.allergies.map((a: string) => (
+                <View key={a} style={[styles.tag, { backgroundColor: COLORS.warningLight, borderColor: COLORS.warning + '30' }]}>
                   <Ionicons name="alert-circle" size={12} color={COLORS.warning} />
                   <Text style={[styles.tagText, { color: '#B8860B' }]}>{a}</Text>
                 </View>
@@ -278,8 +278,8 @@ export default function ProfileScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Interests & Hobbies</Text>
             <View style={styles.tagContainer}>
-              {recipient.interests.map((i: string, idx: number) => (
-                <View key={idx} style={[styles.tag, { backgroundColor: COLORS.secondaryLight, borderColor: COLORS.secondary + '30' }]}>
+              {recipient.interests.map((i: string) => (
+                <View key={i} style={[styles.tag, { backgroundColor: COLORS.secondaryLight, borderColor: COLORS.secondary + '30' }]}>
                   <Ionicons name="heart" size={12} color={COLORS.secondary} />
                   <Text style={[styles.tagText, { color: COLORS.secondaryDark }]}>{i}</Text>
                 </View>

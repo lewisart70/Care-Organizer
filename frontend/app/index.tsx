@@ -44,12 +44,10 @@ export default function LoginScreen() {
   });
 
   useEffect(() => {
-    logAuthEvent('LoginScreen mounted', { isLoading, hasUser: !!user });
     if (!isLoading && user) {
-      logAuthEvent('User already authenticated, navigating to home', { userId: user.user_id });
       router.replace('/(tabs)/home');
     }
-  }, [user, isLoading]);
+  }, [user, isLoading, router]);
 
   useEffect(() => {
     // Check if Apple Sign-In is available (iOS only)

@@ -7,21 +7,210 @@ import base64
 import uuid
 from datetime import datetime
 
-# Use the correct backend URL from frontend .env
+# Use the correct backend URL from the agent context
 BACKEND_URL = "https://railway-recovery.preview.emergentagent.com/api"
 
 class FamilyCareOrganizerTestRunner:
     def __init__(self):
         self.token = None
         self.care_recipient_id = None
-        # Test credentials as provided in the review request
-        self.test_email = "sarah@familycare.com"
-        self.test_password = "Demo123!"
-        self.test_name = "Sarah Test"
+        # Demo credentials from test_credentials.md
+        self.demo_email = "demo@familycareorganizer.com"
+        self.demo_password = "Demo2026!"
+        self.test_name = "Demo User"
         
     def log(self, message, level="INFO"):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"[{timestamp}] {level}: {message}")
+    
+    def test_health_check(self):
+        """Test health check endpoint"""
+        self.log("Testing health check endpoint...")
+        
+        try:
+            response = requests.get(f"{BACKEND_URL}/health")
+            self.log(f"Health check response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("status") == "healthy":
+                    self.log("✅ PASS: Health check successful")
+                    self.log(f"  Database status: {result.get('database', 'unknown')}")
+                    return True
+                else:
+                    self.log("❌ FAIL: Health check returned unhealthy status")
+                    return False
+            else:
+                self.log(f"❌ FAIL: Health check failed with status {response.status_code}: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log(f"❌ FAIL: Health check error: {str(e)}")
+            return False
+
+    def test_demo_login(self):
+        """Test login with demo credentials"""
+        self.log(f"Testing demo login with {self.demo_email}...")
+        
+        data = {
+            "email": self.demo_email,
+            "password": self.demo_password
+        }
+        
+        try:
+            response = requests.post(f"{BACKEND_URL}/auth/login", json=data)
+            self.log(f"Demo login response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                result = response.json()
+                self.token = result.get("token")
+                user = result.get("user", {})
+                
+                if self.token and user:
+                    self.log(f"✅ PASS: Demo login successful for user: {user.get('name', user.get('email'))}")
+                    return True
+                else:
+                    self.log("❌ FAIL: Invalid demo login response format")
+                    return False
+            else:
+                self.log(f"❌ FAIL: Demo login failed with status {response.status_code}: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log(f"❌ FAIL: Demo login error: {str(e)}")
+            return False
+
+    def test_apple_auth_new_user(self):
+        """Test Apple auth with new user"""
+        self.log("Testing Apple auth with new user...")
+        
+        # Generate unique Apple user ID
+        apple_user_id = f"apple_test_{uuid.uuid4().hex[:12]}"
+        test_email = f"apple_test_{uuid.uuid4().hex[:8]}@privaterelay.appleid.com"
+        
+        data = {
+            "user_id": apple_user_id,
+            "email": test_email,
+            "full_name": "Apple Test User"
+        }
+        
+        try:
+            response = requests.post(f"{BACKEND_URL}/auth/apple", json=data)
+            self.log(f"Apple auth new user response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                result = response.json()
+                token = result.get("token")
+                user = result.get("user", {})
+                token_verified = result.get("token_verified")
+                
+                if token and user and user.get("email") == test_email:
+                    self.log(f"✅ PASS: Apple auth new user successful")
+                    self.log(f"  Token verified: {token_verified}")
+                    return True
+                else:
+                    self.log("❌ FAIL: Invalid Apple auth new user response format")
+                    return False
+            else:
+                self.log(f"❌ FAIL: Apple auth new user failed with status {response.status_code}: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log(f"❌ FAIL: Apple auth new user error: {str(e)}")
+            return False
+
+    def test_apple_auth_empty_user_id(self):
+        """Test Apple auth with empty user_id - should return 400"""
+        self.log("Testing Apple auth with empty user_id...")
+        
+        data = {
+            "user_id": "",
+            "email": "test@example.com",
+            "full_name": "Test User"
+        }
+        
+        try:
+            response = requests.post(f"{BACKEND_URL}/auth/apple", json=data)
+            self.log(f"Apple auth empty user_id response status: {response.status_code}")
+            
+            if response.status_code == 400:
+                self.log("✅ PASS: Apple auth correctly rejected empty user_id with 400")
+                return True
+            else:
+                self.log(f"❌ FAIL: Apple auth should return 400 for empty user_id, got {response.status_code}")
+                return False
+                
+        except Exception as e:
+            self.log(f"❌ FAIL: Apple auth empty user_id error: {str(e)}")
+            return False
+
+    def test_auth_me(self):
+        """Test /auth/me endpoint with valid token"""
+        if not self.token:
+            self.log("❌ FAIL: No authentication token available for /auth/me test")
+            return False
+        
+        self.log("Testing /auth/me endpoint...")
+        
+        headers = {"Authorization": f"Bearer {self.token}"}
+        
+        try:
+            response = requests.get(f"{BACKEND_URL}/auth/me", headers=headers)
+            self.log(f"Auth me response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("user_id") and result.get("email"):
+                    self.log(f"✅ PASS: /auth/me successful for user: {result.get('name', result.get('email'))}")
+                    return True
+                else:
+                    self.log("❌ FAIL: Invalid /auth/me response format")
+                    return False
+            else:
+                self.log(f"❌ FAIL: /auth/me failed with status {response.status_code}: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log(f"❌ FAIL: /auth/me error: {str(e)}")
+            return False
+
+    def test_google_auth(self):
+        """Test Google auth with google_user_id and email"""
+        self.log("Testing Google auth...")
+        
+        # Generate unique Google user ID
+        google_user_id = f"google_test_{uuid.uuid4().hex[:12]}"
+        test_email = f"google_test_{uuid.uuid4().hex[:8]}@gmail.com"
+        
+        data = {
+            "google_user_id": google_user_id,
+            "email": test_email,
+            "name": "Google Test User",
+            "picture": "https://example.com/picture.jpg"
+        }
+        
+        try:
+            response = requests.post(f"{BACKEND_URL}/auth/google", json=data)
+            self.log(f"Google auth response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                result = response.json()
+                token = result.get("token")
+                user = result.get("user", {})
+                
+                if token and user and user.get("email") == test_email:
+                    self.log(f"✅ PASS: Google auth successful")
+                    return True
+                else:
+                    self.log("❌ FAIL: Invalid Google auth response format")
+                    return False
+            else:
+                self.log(f"❌ FAIL: Google auth failed with status {response.status_code}: {response.text}")
+                return False
+                
+        except Exception as e:
+            self.log(f"❌ FAIL: Google auth error: {str(e)}")
+            return False
     
     def test_auth_register(self):
         """Test user registration with unique email"""
@@ -30,7 +219,7 @@ class FamilyCareOrganizerTestRunner:
         
         data = {
             "email": unique_email,
-            "password": self.test_password,
+            "password": self.demo_password,
             "name": "Test User Registration"
         }
         
@@ -55,12 +244,12 @@ class FamilyCareOrganizerTestRunner:
             return False
     
     def test_auth_login(self):
-        """Test login with provided credentials"""
-        self.log(f"Testing login with {self.test_email}...")
+        """Test login with demo credentials (fallback if demo login fails)"""
+        self.log(f"Testing login with {self.demo_email}...")
         
         data = {
-            "email": self.test_email,
-            "password": self.test_password
+            "email": self.demo_email,
+            "password": self.demo_password
         }
         
         try:
@@ -744,43 +933,20 @@ class FamilyCareOrganizerTestRunner:
             return False
     
     def run_all_tests(self):
-        """Run all API tests"""
+        """Run all API tests focusing on code quality fixes verification"""
         self.log("=" * 80)
-        self.log("FAMILY CARE ORGANIZER BACKEND API COMPREHENSIVE TESTING")
+        self.log("FAMILY CARE ORGANIZER BACKEND API TESTING - CODE QUALITY FIXES")
         self.log("=" * 80)
         
         tests = [
-            # Authentication tests
-            ("Auth: Register", self.test_auth_register),
-            ("Auth: Login", self.test_auth_login),
-            ("Auth: Logout", self.test_auth_logout),
-            
-            # Care Recipients tests
-            ("Care Recipients: Create", self.test_care_recipients_create),
-            ("Care Recipients: List", self.test_care_recipients_list),
-            ("Care Recipients: Update", self.test_care_recipients_update),
-            ("Care Recipients: Delete", self.test_care_recipients_delete),
-            
-            # Medications tests
-            ("Medications: Create", self.test_medications_create),
-            ("Medications: List", self.test_medications_list),
-            
-            # Appointments tests
-            ("Appointments: Create", self.test_appointments_create),
-            ("Appointments: List", self.test_appointments_list),
-            
-            # Notes tests
-            ("Notes: Create", self.test_notes_create),
-            ("Notes: List", self.test_notes_list),
-            ("Notes: Update", self.test_notes_update),
-            
-            # Caregivers/Team tests
-            ("Caregivers: List", self.test_caregivers_list),
-            ("Caregivers: Invite", self.test_invite_caregiver),
-            
-            # Dashboard and Export tests
-            ("Dashboard: Get Data", self.test_dashboard),
-            ("Export: PDF Report", self.test_export_report),
+            # Core health and authentication tests as requested
+            ("Health Check", self.test_health_check),
+            ("Demo Login", self.test_demo_login),
+            ("Apple Auth - New User", self.test_apple_auth_new_user),
+            ("Apple Auth - Empty User ID", self.test_apple_auth_empty_user_id),
+            ("Auth Register", self.test_auth_register),
+            ("Auth Me", self.test_auth_me),
+            ("Google Auth", self.test_google_auth),
         ]
         
         results = {}
@@ -803,41 +969,19 @@ class FamilyCareOrganizerTestRunner:
         
         # Final summary
         self.log("\n" + "=" * 80)
-        self.log("FAMILY CARE ORGANIZER API TESTING SUMMARY")
+        self.log("CODE QUALITY FIXES TESTING SUMMARY")
         self.log("=" * 80)
         
-        # Group results by category
-        auth_tests = [(k, v) for k, v in results.items() if k.startswith("Auth:")]
-        care_tests = [(k, v) for k, v in results.items() if k.startswith("Care Recipients:")]
-        med_tests = [(k, v) for k, v in results.items() if k.startswith("Medications:")]
-        appt_tests = [(k, v) for k, v in results.items() if k.startswith("Appointments:")]
-        note_tests = [(k, v) for k, v in results.items() if k.startswith("Notes:")]
-        caregiver_tests = [(k, v) for k, v in results.items() if k.startswith("Caregivers:")]
-        other_tests = [(k, v) for k, v in results.items() if not any(k.startswith(prefix) for prefix in ["Auth:", "Care Recipients:", "Medications:", "Appointments:", "Notes:", "Caregivers:"])]
-        
-        categories = [
-            ("🔐 Authentication Tests", auth_tests),
-            ("👥 Care Recipients Tests", care_tests),
-            ("💊 Medications Tests", med_tests),
-            ("📅 Appointments Tests", appt_tests),
-            ("📝 Notes Tests", note_tests),
-            ("🤝 Caregivers Tests", caregiver_tests),
-            ("📊 Other Features", other_tests),
-        ]
-        
-        for category_name, category_tests in categories:
-            if category_tests:
-                self.log(f"\n{category_name}:")
-                for test_name, result in category_tests:
-                    status = "✅ PASSED" if result else "❌ FAILED"
-                    self.log(f"  {test_name}: {status}")
+        for test_name, result in results.items():
+            status = "✅ PASSED" if result else "❌ FAILED"
+            self.log(f"  {test_name}: {status}")
         
         self.log(f"\nTotal Tests: {len(tests)}")
         self.log(f"Passed: {passed}")
         self.log(f"Failed: {failed}")
         
         if failed == 0:
-            self.log("\n🎉 ALL FAMILY CARE ORGANIZER API TESTS PASSED!")
+            self.log("\n🎉 ALL CODE QUALITY FIXES TESTS PASSED!")
             return True
         else:
             self.log(f"\n⚠️  {failed} TESTS FAILED - See details above")
@@ -851,9 +995,9 @@ class FamilyCareOrganizerTestRunner:
             return False
 
 if __name__ == "__main__":
-    print("Family Care Organizer Backend API Testing")
+    print("Family Care Organizer Backend API Testing - Code Quality Fixes")
     print(f"Testing against: {BACKEND_URL}")
-    print("Using test credentials: sarah@familycare.com / Demo123!")
+    print("Using demo credentials: demo@familycareorganizer.com / Demo2026!")
     print()
     
     tester = FamilyCareOrganizerTestRunner()

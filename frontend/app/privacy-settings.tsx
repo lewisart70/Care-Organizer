@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, TouchableOpacity, StyleSheet, ScrollView, 
   ActivityIndicator, Alert, Linking 
@@ -24,9 +24,9 @@ export default function PrivacySettingsScreen() {
 
   useEffect(() => {
     loadDataPolicy();
-  }, []);
+  }, [loadDataPolicy]);
 
-  const loadDataPolicy = async () => {
+  const loadDataPolicy = useCallback(async () => {
     try {
       const policy = await api.get('/compliance/data-policy');
       setDataPolicy(policy);
@@ -35,7 +35,7 @@ export default function PrivacySettingsScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const handleExportData = async () => {
     Alert.alert(
@@ -257,8 +257,8 @@ export default function PrivacySettingsScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Compliance Frameworks</Text>
             <View style={styles.frameworksContainer}>
-              {dataPolicy.compliance_frameworks?.map((framework: string, index: number) => (
-                <View key={index} style={styles.frameworkBadge}>
+              {dataPolicy.compliance_frameworks?.map((framework: string) => (
+                <View key={framework} style={styles.frameworkBadge}>
                   <Ionicons name="checkmark-circle" size={14} color={COLORS.success} />
                   <Text style={styles.frameworkText}>{framework}</Text>
                 </View>

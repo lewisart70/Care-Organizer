@@ -84,8 +84,8 @@ export default function AboutBookScreen() {
             'Emergency planning tools and legal and financial checklists',
             'A perpetual calendar for appointments and important dates',
             'A curated product resource guide featuring helpful tools and equipment',
-          ].map((item, index) => (
-            <View key={index} style={styles.featureItem}>
+          ].map((item) => (
+            <View key={item.slice(0, 30)} style={styles.featureItem}>
               <Ionicons name="checkmark-circle" size={18} color={COLORS.secondary} />
               <Text style={styles.featureText}>{item}</Text>
             </View>
