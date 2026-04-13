@@ -3,26 +3,34 @@
 ## Architecture
 - **Frontend**: React Native / Expo (iOS & Android)
 - **Backend**: FastAPI on Railway + MongoDB
+- **AI**: OpenAI SDK (gpt-4o-mini, gpt-4o, whisper-1) via OPENAI_API_KEY
 
 ## All Changes (Apr 13, 2026)
 
 ### Session 1 - Auth Bug Fixes
-- Health check endpoint, demo account seeding, 422 error handler, Apple auth hardening, identity token JWT verification
+- Health check, demo account seeding, 422 handler, Apple auth hardening, identity token verification
 
-### Session 2 - Code Quality Fixes
-- XSS fix, 41 hook dependency fixes, useMemo on context providers, 6 index-as-key fixes
+### Session 2 - Code Quality
+- XSS fix, 41 hook dependency fixes, useMemo on contexts, 6 index-as-key fixes
 
 ### Session 3 - Component Extraction
-- AppointmentCard (110 lines), AISummaryModal (47 lines), LegalItemCard (107 lines)
+- AppointmentCard, AISummaryModal, LegalItemCard
 
-### Session 4 - Console Statement Removal
-- Removed ALL 48 console.log/error/warn statements across 26 frontend files
-- Removed `logAuthEvent` debug helper function from index.tsx and AuthContext.tsx
-- Zero console statements remain in production code
+### Session 4 - Console Removal
+- Removed all 48 console statements from 26 frontend files
 
-### Total: 32 files (29 modified + 3 new)
+### Session 5 - Railway Build Fix
+- **Root cause**: `emergentintegrations` is an Emergent-internal package not on PyPI
+- Replaced all 5 AI usage sites with direct `openai` SDK (`AsyncOpenAI`):
+  - STT: `openai.audio.transcriptions.create()` (whisper-1)
+  - Chat: `openai.chat.completions.create()` (gpt-4o-mini / gpt-4o)
+- Added `ai_chat_completion()` and `clean_json_response()` helpers
+- Removed `emergentintegrations==0.1.0` from requirements.txt
+- Env var: `OPENAI_API_KEY` (falls back to `EMERGENT_LLM_KEY`)
 
-## Remaining Backlog
-- **P0**: Push to GitHub → Railway auto-deploys backend; rebuild iOS with EAS
-- **P1**: Further component extraction: emergency-contacts, export-report, notes-tab
-- **P2**: Increase TypeScript/Python type coverage
+### Total: 33 files (30 modified + 3 new)
+
+## Railway Deployment Checklist
+1. Push to GitHub
+2. Add `OPENAI_API_KEY` env var in Railway (standard OpenAI key)
+3. Verify health: https://care-organizer-production.up.railway.app/api/health
