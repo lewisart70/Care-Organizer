@@ -1,14 +1,15 @@
 # Test Credentials
 
-## Demo Account (For Apple Review)
-- **Email:** demo@test.com
-- **Password:** Demo123!
+## Demo Account (for Apple Review)
+- Email: demo@familycareorganizer.com
+- Password: Demo2026!
+- Note: Auto-seeded on backend startup when DEMO_ACCOUNT_EMAIL and DEMO_ACCOUNT_PASSWORD env vars are set
 
-### Demo Data Includes:
-- Care Recipient: Margaret Johnson
-- 3 Medications: Metformin, Lisinopril, Acetaminophen
-- 2 Upcoming Appointments
-- Medical conditions: Type 2 Diabetes, Hypertension, Mild Arthritis
+## Test Apple Auth
+- Apple User ID: any valid Apple user ID from AppleAuthentication SDK
+- Endpoint: POST /api/auth/apple
+- Body: {"user_id": "<apple_user_id>", "email": "<optional>", "full_name": "<optional>"}
 
-## Production Backend
-- URL: https://care-organizer-production.up.railway.app
+## Test Google Auth
+- Endpoint: POST /api/auth/google
+- Body: {"google_user_id": "<google_id>", "email": "<email>", "name": "<name>", "picture": "<url>"}
