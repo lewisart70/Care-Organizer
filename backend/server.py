@@ -1,5 +1,6 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.exceptions import RequestValidationError
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -45,12 +46,26 @@ JWT_ALGORITHM = "HS256"
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
+DEMO_ACCOUNT_EMAIL = os.environ.get('DEMO_ACCOUNT_EMAIL', '')
+DEMO_ACCOUNT_PASSWORD = os.environ.get('DEMO_ACCOUNT_PASSWORD', '')
 
 # Initialize Resend
 resend.api_key = RESEND_API_KEY
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
+
+# Custom validation error handler - returns clearer error messages instead of raw 422
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    missing_fields = [e["loc"][-1] for e in errors if e["type"] == "missing"]
+    if missing_fields:
+        detail = f"Missing required fields: {', '.join(str(f) for f in missing_fields)}"
+    else:
+        detail = "; ".join(e.get("msg", "Validation error") for e in errors)
+    logger.warning(f"Validation error on {request.method} {request.url.path}: {detail}")
+    return JSONResponse(status_code=422, content={"detail": detail})
 
 # Security Headers Middleware
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -69,6 +84,53 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# ======================== HEALTH CHECK & STARTUP ========================
+
+@api_router.get("/health")
+async def health_check():
+    """Health check endpoint for Railway monitoring and Apple review verification."""
+    try:
+        # Quick DB connectivity check
+        await db.command("ping")
+        db_status = "connected"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+    return {
+        "status": "healthy",
+        "database": db_status,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+@app.on_event("startup")
+async def seed_demo_account():
+    """Seed demo account on startup if DEMO_ACCOUNT_EMAIL is configured."""
+    if DEMO_ACCOUNT_EMAIL and DEMO_ACCOUNT_PASSWORD:
+        try:
+            existing = await db.users.find_one({"email": DEMO_ACCOUNT_EMAIL}, {"_id": 0})
+            if not existing:
+                user_id = f"user_{uuid.uuid4().hex[:12]}"
+                demo_user = {
+                    "user_id": user_id,
+                    "email": DEMO_ACCOUNT_EMAIL,
+                    "name": "Demo User",
+                    "password_hash": hash_password(DEMO_ACCOUNT_PASSWORD),
+                    "picture": None,
+                    "disclaimer_accepted": True,
+                    "disclaimer_accepted_at": datetime.now(timezone.utc).isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+                await db.users.insert_one(demo_user)
+                logger.info(f"Demo account seeded: {DEMO_ACCOUNT_EMAIL}")
+            else:
+                # Ensure password is up-to-date
+                await db.users.update_one(
+                    {"email": DEMO_ACCOUNT_EMAIL},
+                    {"$set": {"password_hash": hash_password(DEMO_ACCOUNT_PASSWORD)}}
+                )
+                logger.info(f"Demo account already exists: {DEMO_ACCOUNT_EMAIL}")
+        except Exception as e:
+            logger.error(f"Failed to seed demo account: {e}")
 
 # ======================== PYDANTIC MODELS ========================
 
@@ -480,14 +542,21 @@ async def register(data: UserRegister):
 
 @api_router.post("/auth/login")
 async def login(data: UserLogin):
+    logger.info(f"Login attempt for email: {data.email}")
     user = await db.users.find_one({"email": data.email}, {"_id": 0})
     if not user:
+        logger.warning(f"Login failed - user not found: {data.email}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if "password_hash" not in user:
-        raise HTTPException(status_code=401, detail="Please sign in with Google")
+        # User signed up via Apple or Google - no password set
+        auth_method = "Apple" if user.get("apple_user_id") else "Google" if user.get("google_user_id") else "social"
+        logger.warning(f"Login failed - user has no password (signed up via {auth_method}): {data.email}")
+        raise HTTPException(status_code=401, detail=f"Please sign in with {auth_method}")
     if not verify_password(data.password, user["password_hash"]):
+        logger.warning(f"Login failed - wrong password: {data.email}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = create_token(user["user_id"], user["email"])
+    logger.info(f"Login successful: {data.email}")
     return {
         "token": token,
         "user": {
@@ -511,69 +580,84 @@ async def apple_auth(data: AppleAuthRequest):
     Authenticate user with Apple Sign-In credentials.
     Apple only provides email/name on FIRST sign-in, so we store it.
     """
+    logger.info(f"Apple auth attempt - user_id prefix: {data.user_id[:10] if data.user_id else 'NONE'}..., email: {data.email}, has_name: {bool(data.full_name)}")
+    
+    if not data.user_id or not data.user_id.strip():
+        logger.error("Apple auth failed - empty user_id")
+        raise HTTPException(status_code=400, detail="Apple user ID is required")
+    
     # Use Apple user ID as unique identifier
-    apple_user_id = data.user_id
+    apple_user_id = data.user_id.strip()
     
-    # Check if user already exists (by Apple ID stored in metadata)
-    existing = await db.users.find_one({"apple_user_id": apple_user_id}, {"_id": 0})
-    
-    if existing:
-        # Returning user - use stored info
-        user_id = existing["user_id"]
-        disclaimer_accepted = existing.get("disclaimer_accepted", False)
-        token = create_token(user_id, existing["email"])
-        return {
-            "token": token,
-            "user": {
-                "user_id": user_id,
-                "email": existing["email"],
-                "name": existing["name"],
-                "picture": existing.get("picture"),
-                "disclaimer_accepted": disclaimer_accepted
-            }
-        }
-    else:
-        # New user - create account
-        # Apple only provides email on first sign-in
-        email = data.email or f"{apple_user_id}@privaterelay.appleid.com"
-        name = data.full_name or "Apple User"
+    try:
+        # Check if user already exists (by Apple ID stored in metadata)
+        existing = await db.users.find_one({"apple_user_id": apple_user_id}, {"_id": 0})
         
-        # Check if email already exists (user might have registered with email first)
-        existing_email = await db.users.find_one({"email": email}, {"_id": 0})
-        if existing_email:
-            # Link Apple ID to existing account
-            await db.users.update_one(
-                {"email": email},
-                {"$set": {"apple_user_id": apple_user_id}}
-            )
-            user_id = existing_email["user_id"]
-            disclaimer_accepted = existing_email.get("disclaimer_accepted", False)
+        if existing:
+            # Returning user - use stored info
+            user_id = existing["user_id"]
+            disclaimer_accepted = existing.get("disclaimer_accepted", False)
+            token = create_token(user_id, existing["email"])
+            logger.info(f"Apple auth success (returning user): {existing['email']}")
+            return {
+                "token": token,
+                "user": {
+                    "user_id": user_id,
+                    "email": existing["email"],
+                    "name": existing["name"],
+                    "picture": existing.get("picture"),
+                    "disclaimer_accepted": disclaimer_accepted
+                }
+            }
         else:
-            # Create new user
-            user_id = f"user_{uuid.uuid4().hex[:12]}"
-            await db.users.insert_one({
-                "user_id": user_id,
-                "apple_user_id": apple_user_id,
-                "email": email,
-                "name": name,
-                "picture": None,
-                "disclaimer_accepted": False,
-                "disclaimer_accepted_at": None,
-                "created_at": datetime.now(timezone.utc).isoformat()
-            })
-            disclaimer_accepted = False
-        
-        token = create_token(user_id, email)
-        return {
-            "token": token,
-            "user": {
-                "user_id": user_id,
-                "email": email,
-                "name": name,
-                "picture": None,
-                "disclaimer_accepted": disclaimer_accepted
+            # New user - create account
+            # Apple only provides email on first sign-in
+            email = data.email or f"{apple_user_id[:20]}@privaterelay.appleid.com"
+            name = data.full_name or "Apple User"
+            
+            # Check if email already exists (user might have registered with email first)
+            existing_email = await db.users.find_one({"email": email}, {"_id": 0})
+            if existing_email:
+                # Link Apple ID to existing account
+                await db.users.update_one(
+                    {"email": email},
+                    {"$set": {"apple_user_id": apple_user_id}}
+                )
+                user_id = existing_email["user_id"]
+                disclaimer_accepted = existing_email.get("disclaimer_accepted", False)
+                logger.info(f"Apple auth success (linked to existing account): {email}")
+            else:
+                # Create new user
+                user_id = f"user_{uuid.uuid4().hex[:12]}"
+                await db.users.insert_one({
+                    "user_id": user_id,
+                    "apple_user_id": apple_user_id,
+                    "email": email,
+                    "name": name,
+                    "picture": None,
+                    "disclaimer_accepted": False,
+                    "disclaimer_accepted_at": None,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                })
+                disclaimer_accepted = False
+                logger.info(f"Apple auth success (new user created): {email}")
+            
+            token = create_token(user_id, email)
+            return {
+                "token": token,
+                "user": {
+                    "user_id": user_id,
+                    "email": email,
+                    "name": name,
+                    "picture": None,
+                    "disclaimer_accepted": disclaimer_accepted
+                }
             }
-        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Apple auth unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Authentication failed. Please try again.")
 
 @api_router.post("/auth/google")
 async def google_auth(request: Request):
