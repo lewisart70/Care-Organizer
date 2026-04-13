@@ -36,7 +36,7 @@ export default function NutritionScreen() {
       if (data.favorite_meals) {
         setFavoriteMeals(data.favorite_meals);
       }
-    } catch (e) { console.error(e); }
+    } catch (e) {  }
     finally { setLoading(false); }
   }, [selectedRecipientId]);
 

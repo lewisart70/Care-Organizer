@@ -14,12 +14,6 @@ import { useAuth } from '../src/context/AuthContext';
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../src/constants/theme';
 import { Logo } from '../src/components/Logo';
 
-// Debug logging for auth issues
-const logAuthEvent = (event: string, data?: any) => {
-  const timestamp = new Date().toISOString();
-  console.log(`[AUTH ${timestamp}] ${event}`, data ? JSON.stringify(data, null, 2) : '');
-};
-
 // Google OAuth Client ID for iOS
 const GOOGLE_IOS_CLIENT_ID = '477062471666-2a4df0o10g8b4fkh9asstlln7mpo93h1.apps.googleusercontent.com';
 
@@ -52,7 +46,6 @@ export default function LoginScreen() {
   useEffect(() => {
     // Check if Apple Sign-In is available (iOS only)
     AppleAuthentication.isAvailableAsync().then((available) => {
-      logAuthEvent('Apple Sign-In availability check', { available, platform: Platform.OS });
       setAppleAuthAvailable(available);
     });
   }, []);
@@ -60,13 +53,12 @@ export default function LoginScreen() {
   // Handle Google Sign-In response
   useEffect(() => {
     if (response?.type === 'success') {
-      logAuthEvent('Google auth response success', { hasAccessToken: !!response.authentication?.accessToken });
       const { authentication } = response;
       if (authentication?.accessToken) {
         handleGoogleLogin(authentication.accessToken);
       }
     } else if (response) {
-      logAuthEvent('Google auth response', { type: response.type });
+      // Google auth returned non-success
     }
   }, [response]);
 
@@ -74,23 +66,18 @@ export default function LoginScreen() {
     try {
       setLoading(true);
       setError('');
-      logAuthEvent('Google login started');
       
       // Fetch user info from Google
       const userInfoResponse = await fetch('https://www.googleapis.com/userinfo/v2/me', {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const userInfo = await userInfoResponse.json();
-      logAuthEvent('Google user info fetched', { email: userInfo.email, hasId: !!userInfo.id });
       
       // Login with Google credentials via our backend
       await loginWithGoogle(userInfo.id, userInfo.email, userInfo.name, userInfo.picture);
-      logAuthEvent('Google login successful, navigating to home');
       
       router.replace('/(tabs)/home');
     } catch (e: any) {
-      logAuthEvent('Google login error', { message: e.message, code: e.code });
-      console.error('Google login error:', e);
       setError(e.message || 'Google Sign-In failed');
     } finally {
       setLoading(false);
@@ -104,13 +91,10 @@ export default function LoginScreen() {
     }
     setError('');
     setLoading(true);
-    logAuthEvent('Email login started', { email: email.trim() });
     try {
       await login(email.trim(), password);
-      logAuthEvent('Email login successful, navigating to home');
       router.replace('/(tabs)/home');
     } catch (e: any) {
-      logAuthEvent('Email login error', { message: e.message });
       setError(e.message || 'Login failed');
     } finally {
       setLoading(false);
@@ -126,7 +110,6 @@ export default function LoginScreen() {
     try {
       setError('');
       setLoading(true);
-      logAuthEvent('Apple Sign-In started', { platform: Platform.OS });
       
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
@@ -135,7 +118,6 @@ export default function LoginScreen() {
         ],
       });
 
-      logAuthEvent('Apple credential received', { 
         hasUser: !!credential.user, 
         hasEmail: !!credential.email,
         hasFullName: !!credential.fullName,
@@ -148,7 +130,6 @@ export default function LoginScreen() {
         ? `${credential.fullName.givenName || ''} ${credential.fullName.familyName || ''}`.trim()
         : undefined;
 
-      logAuthEvent('Calling loginWithApple', { 
         userId: credential.user?.substring(0, 10) + '...', 
         email: credential.email,
         fullName,
@@ -163,7 +144,6 @@ export default function LoginScreen() {
         credential.identityToken || undefined
       );
       
-      logAuthEvent('Apple login successful, navigating to home');
       
       // Navigate to home
       router.replace('/(tabs)/home');
@@ -171,15 +151,11 @@ export default function LoginScreen() {
     } catch (error: any) {
       if (error.code === 'ERR_REQUEST_CANCELED') {
         // User cancelled - don't show error
-        logAuthEvent('Apple Sign-In cancelled by user');
-        console.log('User cancelled Apple Sign-In');
       } else {
-        logAuthEvent('Apple Sign-In error', { 
           message: error.message, 
           code: error.code,
           name: error.name 
         });
-        console.error('Apple Sign-In error:', error);
         setError(error.message || 'Apple Sign-In failed. Please try again.');
       }
     } finally {

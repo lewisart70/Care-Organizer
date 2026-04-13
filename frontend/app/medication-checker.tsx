@@ -20,7 +20,7 @@ export default function MedicationCheckerScreen() {
     if (!selectedRecipientId) { setLoading(false); return; }
     (async () => {
       try { setMeds(await api.get(`/care-recipients/${selectedRecipientId}/medications`)); }
-      catch (e) { console.error(e); } finally { setLoading(false); }
+      catch (e) {  } finally { setLoading(false); }
     })();
   }, [selectedRecipientId]));
 

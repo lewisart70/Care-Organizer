@@ -45,7 +45,6 @@ export default function AddRecipientScreen() {
         setProfilePhoto(base64Uri);
       }
     } catch (err) {
-      console.error('Image picker error:', err);
       Alert.alert('Error', 'Failed to select image');
     }
   };
@@ -71,7 +70,6 @@ export default function AddRecipientScreen() {
         setProfilePhoto(base64Uri);
       }
     } catch (err) {
-      console.error('Camera error:', err);
       Alert.alert('Error', 'Failed to take photo');
     }
   };
@@ -111,7 +109,6 @@ export default function AddRecipientScreen() {
             photo_base64: profilePhoto
           });
         } catch (photoErr) {
-          console.error('Failed to upload photo:', photoErr);
           // Don't fail the whole operation if photo upload fails
         }
       }

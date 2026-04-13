@@ -62,7 +62,7 @@ export default function AppointmentsScreen() {
   const load = useCallback(async () => {
     if (!selectedRecipientId) { setLoading(false); return; }
     try { setItems(await api.get(`/care-recipients/${selectedRecipientId}/appointments`)); }
-    catch (e) { console.error(e); } finally { setLoading(false); }
+    catch (e) {  } finally { setLoading(false); }
   }, [selectedRecipientId]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -127,7 +127,6 @@ export default function AppointmentsScreen() {
       await recorder.record();
       setIsRecording(true);
     } catch (err) {
-      console.error('Failed to start recording:', err);
       Alert.alert('Error', 'Failed to start recording. Please check microphone permissions.');
     }
   };
@@ -167,7 +166,6 @@ export default function AppointmentsScreen() {
         }
       }
     } catch (err: any) {
-      console.error('Transcription error:', err);
       Alert.alert('Transcription Failed', err.message || 'Could not transcribe audio');
     } finally {
       setIsTranscribing(false);
@@ -193,7 +191,6 @@ export default function AppointmentsScreen() {
         setShowSummary(true);
       }
     } catch (err: any) {
-      console.error('Summarization error:', err);
       Alert.alert('Summarization Failed', err.message || 'Could not summarize the recording');
     } finally {
       setIsSummarizing(false);

@@ -24,7 +24,7 @@ export default function ChatScreen() {
     try {
       const msgs = await api.get(`/care-recipients/${selectedRecipientId}/chat`);
       setMessages(msgs);
-    } catch (e) { console.error(e); }
+    } catch (e) {  }
     finally { setLoading(false); }
   }, [selectedRecipientId]);
 
@@ -48,7 +48,7 @@ export default function ChatScreen() {
       setText('');
       setPhoto(null);
       await loadMessages();
-    } catch (e: any) { console.error(e); }
+    } catch (e: any) {  }
     finally { setSending(false); }
   };
 

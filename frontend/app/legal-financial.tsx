@@ -66,7 +66,6 @@ export default function LegalFinancialScreen() {
         setIsUnlocked(true);
       }
     } catch (e) {
-      console.error('Error checking access:', e);
       setIsUnlocked(true); // Allow access if check fails
     }
   }, [selectedRecipientId]);
@@ -78,7 +77,7 @@ export default function LegalFinancialScreen() {
   const load = useCallback(async () => {
     if (!selectedRecipientId || !isUnlocked) { setLoading(false); return; }
     try { setItems(await api.get(`/care-recipients/${selectedRecipientId}/legal-financial`)); } 
-    catch (e) { console.error(e); } 
+    catch (e) {  } 
     finally { setLoading(false); }
   }, [selectedRecipientId, isUnlocked]);
 
@@ -238,7 +237,6 @@ export default function LegalFinancialScreen() {
         setForm({ ...form, image: base64Image });
       }
     } catch (e) {
-      console.error('Image picker error:', e);
       Alert.alert('Error', 'Failed to pick image');
     }
   };

@@ -22,7 +22,7 @@ export default function CaregiversScreen() {
     if (!selectedRecipientId) { setLoading(false); return; }
     try { 
       setCaregivers(await api.get(`/care-recipients/${selectedRecipientId}/caregivers`)); 
-    } catch (e) { console.error(e); } 
+    } catch (e) {  } 
     finally { setLoading(false); }
   }, [selectedRecipientId]);
 

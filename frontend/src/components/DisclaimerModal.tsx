@@ -19,7 +19,6 @@ export default function DisclaimerModal({ visible, onAccept }: DisclaimerModalPr
   const [error, setError] = useState('');
 
   const handleAccept = async () => {
-    console.log('handleAccept called, checked:', checked);
     setError('');
     
     if (!checked) {
@@ -33,12 +32,9 @@ export default function DisclaimerModal({ visible, onAccept }: DisclaimerModalPr
 
     setLoading(true);
     try {
-      console.log('Calling accept-disclaimer API...');
       await api.post('/auth/accept-disclaimer');
-      console.log('API call successful, calling onAccept');
       onAccept();
     } catch (e: any) {
-      console.log('API error:', e);
       const errMsg = e.message || 'Failed to accept disclaimer';
       setError(errMsg);
       if (Platform.OS !== 'web') {
@@ -151,7 +147,6 @@ export default function DisclaimerModal({ visible, onAccept }: DisclaimerModalPr
               pressed && { opacity: 0.7 }
             ]} 
             onPress={() => {
-              console.log('Checkbox pressed, current value:', checked);
               setChecked(!checked);
               setError('');
             }}

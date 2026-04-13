@@ -37,7 +37,7 @@ export default function BathingTrackerScreen() {
   const load = useCallback(async () => {
     if (!selectedRecipientId) { setLoading(false); return; }
     try { setItems(await api.get(`/care-recipients/${selectedRecipientId}/bathing`)); } 
-    catch (e) { console.error(e); } 
+    catch (e) {  } 
     finally { setLoading(false); }
   }, [selectedRecipientId]);
 

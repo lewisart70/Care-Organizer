@@ -99,7 +99,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
           if (!cancelled) updateSubscriptionStatus(updatedInfo);
         });
       } catch (error) {
-        console.error('Failed to initialize RevenueCat:', error);
+        // RevenueCat init failed silently
       } finally {
         if (!cancelled) setLoading(false);
       }

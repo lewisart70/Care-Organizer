@@ -42,7 +42,6 @@ export default function HomeScreen() {
         setIsProfileOwner(true); // Allow new users to create their first profile
       }
     } catch (e) {
-      console.error(e);
     } finally {
       setLoading(false);
       setRefreshing(false);

@@ -31,7 +31,6 @@ export default function PrivacySettingsScreen() {
       const policy = await api.get('/compliance/data-policy');
       setDataPolicy(policy);
     } catch (e) {
-      console.error('Failed to load data policy:', e);
     } finally {
       setLoading(false);
     }

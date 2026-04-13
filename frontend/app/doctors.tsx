@@ -20,7 +20,7 @@ export default function DoctorsScreen() {
   const load = useCallback(async () => {
     if (!selectedRecipientId) { setLoading(false); return; }
     try { setDoctors(await api.get(`/care-recipients/${selectedRecipientId}/doctors`)); }
-    catch (e) { console.error(e); } finally { setLoading(false); }
+    catch (e) {  } finally { setLoading(false); }
   }, [selectedRecipientId]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 

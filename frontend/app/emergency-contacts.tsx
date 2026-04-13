@@ -38,7 +38,7 @@ export default function EmergencyContactsScreen() {
       if (recipientData.dnr_info) setDnrInfo(recipientData.dnr_info);
       if (recipientData.poa_info) setPoaInfo(recipientData.poa_info);
     }
-    catch (e) { console.error(e); } finally { setLoading(false); }
+    catch (e) {  } finally { setLoading(false); }
   }, [selectedRecipientId]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 

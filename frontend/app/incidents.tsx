@@ -32,7 +32,7 @@ export default function IncidentsScreen() {
     try { 
       setItems(await api.get(`/care-recipients/${selectedRecipientId}/incidents`)); 
     } catch (e) { 
-      console.error(e); 
+       
     } finally { 
       setLoading(false); 
     }

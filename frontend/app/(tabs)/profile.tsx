@@ -22,7 +22,7 @@ export default function ProfileScreen() {
     try {
       const data = await api.get(`/care-recipients/${selectedRecipientId}`);
       setRecipient(data);
-    } catch (e) { console.error(e); }
+    } catch (e) {  }
     finally { setLoading(false); setRefreshing(false); }
   }, [selectedRecipientId]);
 
