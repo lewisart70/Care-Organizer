@@ -24,7 +24,6 @@ export default function GoogleCallbackScreen() {
         router.replace('/');
       }
     } catch (error) {
-      console.error('Google auth callback error:', error);
       router.replace('/');
     }
   }, [loginWithGoogle, router]);

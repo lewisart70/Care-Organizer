@@ -73,7 +73,6 @@ export default function FindSupportScreen() {
       const result = await api.get('/resources/categories');
       setCategories(result.categories || []);
     } catch (e) {
-      console.error('Failed to load categories:', e);
       // Fallback categories
       setCategories([
         { id: 'home_care', name: 'Home Care Services', icon: 'home', description: 'PSW agencies, nursing care' },
@@ -93,7 +92,6 @@ export default function FindSupportScreen() {
       const result = await api.get('/resources/saved');
       setSavedResources(result || []);
     } catch (e) {
-      console.error('Failed to load saved resources:', e);
     }
   };
 
@@ -123,7 +121,6 @@ export default function FindSupportScreen() {
         Alert.alert('No Results', 'No resources found for this search. Try adjusting your location or category.');
       }
     } catch (e: any) {
-      console.error('Search error:', e);
       Alert.alert('Search Failed', e.message || 'Failed to search for resources. Please try again.');
     } finally {
       setLoading(false);

@@ -40,7 +40,7 @@ export default function NotesTab() {
   const loadNotes = useCallback(async () => {
     if (!selectedRecipientId) { setLoading(false); return; }
     try { setNotes(await api.get(`/care-recipients/${selectedRecipientId}/notes`)); }
-    catch (e) { console.error(e); }
+    catch (e) {  }
     finally { setLoading(false); }
   }, [selectedRecipientId]);
 
@@ -73,7 +73,6 @@ export default function NotesTab() {
       await recorder.record();
       setIsRecording(true);
     } catch (err) {
-      console.error('Failed to start recording:', err);
       Alert.alert('Error', 'Failed to start recording. Please check microphone permissions.');
     }
   };
@@ -120,7 +119,6 @@ export default function NotesTab() {
         }
       }
     } catch (err: any) {
-      console.error('Transcription error:', err);
       Alert.alert('Transcription Failed', err.message || 'Could not transcribe audio');
     } finally {
       setIsTranscribing(false);

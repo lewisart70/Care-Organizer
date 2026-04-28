@@ -20,7 +20,7 @@ export default function MedicationCheckerScreen() {
     if (!selectedRecipientId) { setLoading(false); return; }
     (async () => {
       try { setMeds(await api.get(`/care-recipients/${selectedRecipientId}/medications`)); }
-      catch (e) { console.error(e); } finally { setLoading(false); }
+      catch (e) {  } finally { setLoading(false); }
     })();
   }, [selectedRecipientId]));
 
@@ -79,7 +79,7 @@ export default function MedicationCheckerScreen() {
           <View style={s.resultSection}>
             <Text style={s.resultTitle}>Analysis Results</Text>
             {result.interactions?.map((inter: any, i: number) => (
-              <View key={i} style={[s.interactionCard, { borderLeftColor: inter.severity === 'high' ? COLORS.error : inter.severity === 'moderate' ? COLORS.warning : COLORS.success }]}>
+              <View key={`interaction-${inter.severity}-${i}`} style={[s.interactionCard, { borderLeftColor: inter.severity === 'high' ? COLORS.error : inter.severity === 'moderate' ? COLORS.warning : COLORS.success }]}>
                 <Text style={s.interMeds}>{Array.isArray(inter.medications) ? inter.medications.join(' + ') : inter.medications}</Text>
                 <View style={[s.severityBadge, { backgroundColor: (inter.severity === 'high' ? COLORS.error : inter.severity === 'moderate' ? COLORS.warning : COLORS.success) + '15' }]}>
                   <Text style={[s.severityText, { color: inter.severity === 'high' ? COLORS.error : inter.severity === 'moderate' ? COLORS.warning : COLORS.success }]}>

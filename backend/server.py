@@ -1,5 +1,6 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.exceptions import RequestValidationError
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -18,8 +19,7 @@ import httpx
 import json
 import base64
 import io
-from emergentintegrations.llm.openai import OpenAISpeechToText
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from openai import AsyncOpenAI
 import resend
 from passlib.context import CryptContext
 from reportlab.lib import colors
@@ -42,15 +42,32 @@ db = client[os.environ['DB_NAME']]
 
 JWT_SECRET = os.environ['JWT_SECRET_KEY']
 JWT_ALGORITHM = "HS256"
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', os.environ.get('EMERGENT_LLM_KEY', ''))
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
+DEMO_ACCOUNT_EMAIL = os.environ.get('DEMO_ACCOUNT_EMAIL', '')
+DEMO_ACCOUNT_PASSWORD = os.environ.get('DEMO_ACCOUNT_PASSWORD', '')
+
+# OpenAI client for AI features (STT, chat completions)
+openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 # Initialize Resend
 resend.api_key = RESEND_API_KEY
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
+
+# Custom validation error handler - returns clearer error messages instead of raw 422
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    missing_fields = [e["loc"][-1] for e in errors if e["type"] == "missing"]
+    if missing_fields:
+        detail = f"Missing required fields: {', '.join(str(f) for f in missing_fields)}"
+    else:
+        detail = "; ".join(e.get("msg", "Validation error") for e in errors)
+    logger.warning(f"Validation error on {request.method} {request.url.path}: {detail}")
+    return JSONResponse(status_code=422, content={"detail": detail})
 
 # Security Headers Middleware
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -69,6 +86,53 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# ======================== HEALTH CHECK & STARTUP ========================
+
+@api_router.get("/health")
+async def health_check():
+    """Health check endpoint for Railway monitoring and Apple review verification."""
+    try:
+        # Quick DB connectivity check
+        await db.command("ping")
+        db_status = "connected"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+    return {
+        "status": "healthy",
+        "database": db_status,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+@app.on_event("startup")
+async def seed_demo_account():
+    """Seed demo account on startup if DEMO_ACCOUNT_EMAIL is configured."""
+    if DEMO_ACCOUNT_EMAIL and DEMO_ACCOUNT_PASSWORD:
+        try:
+            existing = await db.users.find_one({"email": DEMO_ACCOUNT_EMAIL}, {"_id": 0})
+            if not existing:
+                user_id = f"user_{uuid.uuid4().hex[:12]}"
+                demo_user = {
+                    "user_id": user_id,
+                    "email": DEMO_ACCOUNT_EMAIL,
+                    "name": "Demo User",
+                    "password_hash": hash_password(DEMO_ACCOUNT_PASSWORD),
+                    "picture": None,
+                    "disclaimer_accepted": True,
+                    "disclaimer_accepted_at": datetime.now(timezone.utc).isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+                await db.users.insert_one(demo_user)
+                logger.info(f"Demo account seeded: {DEMO_ACCOUNT_EMAIL}")
+            else:
+                # Ensure password is up-to-date
+                await db.users.update_one(
+                    {"email": DEMO_ACCOUNT_EMAIL},
+                    {"$set": {"password_hash": hash_password(DEMO_ACCOUNT_PASSWORD)}}
+                )
+                logger.info(f"Demo account already exists: {DEMO_ACCOUNT_EMAIL}")
+        except Exception as e:
+            logger.error(f"Failed to seed demo account: {e}")
 
 # ======================== PYDANTIC MODELS ========================
 
@@ -398,7 +462,122 @@ class ExportReportRequest(BaseModel):
     delivery_method: str  # "download", "email_self", "email_other"
     recipient_email: Optional[str] = None  # Required if delivery_method is "email_other"
 
+# ======================== AI HELPERS ========================
+
+async def ai_chat_completion(system_message: str, user_message: str, model: str = "gpt-4o-mini") -> str:
+    """Send a chat completion request to OpenAI and return the response text."""
+    if not openai_client:
+        raise HTTPException(status_code=500, detail="AI service not configured. Set OPENAI_API_KEY.")
+    response = await openai_client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message},
+        ],
+    )
+    return response.choices[0].message.content or ""
+
+def clean_json_response(text: str) -> str:
+    """Strip markdown code fences from an LLM JSON response."""
+    cleaned = text.strip()
+    if cleaned.startswith("```json"):
+        cleaned = cleaned[7:]
+    elif cleaned.startswith("```"):
+        cleaned = cleaned[3:]
+    if cleaned.endswith("```"):
+        cleaned = cleaned[:-3]
+    return cleaned.strip()
+
 # ======================== AUTH HELPERS ========================
+
+# Apple Sign-In token verification
+APPLE_PUBLIC_KEYS_URL = "https://appleid.apple.com/auth/keys"
+APPLE_ISSUER = "https://appleid.apple.com"
+APPLE_BUNDLE_ID = "com.familycareorganizer.app"
+_apple_keys_cache = {"keys": None, "fetched_at": None}
+
+async def fetch_apple_public_keys():
+    """Fetch and cache Apple's public keys for identity token verification."""
+    now = datetime.now(timezone.utc)
+    # Cache keys for 24 hours
+    if _apple_keys_cache["keys"] and _apple_keys_cache["fetched_at"]:
+        age = (now - _apple_keys_cache["fetched_at"]).total_seconds()
+        if age < 86400:
+            return _apple_keys_cache["keys"]
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(APPLE_PUBLIC_KEYS_URL, timeout=10)
+            resp.raise_for_status()
+            keys = resp.json().get("keys", [])
+            _apple_keys_cache["keys"] = keys
+            _apple_keys_cache["fetched_at"] = now
+            logger.info(f"Fetched {len(keys)} Apple public keys")
+            return keys
+    except Exception as e:
+        logger.error(f"Failed to fetch Apple public keys: {e}")
+        # Return cached keys if available, even if stale
+        if _apple_keys_cache["keys"]:
+            return _apple_keys_cache["keys"]
+        return []
+
+async def verify_apple_identity_token(identity_token: str) -> Optional[dict]:
+    """
+    Verify an Apple identity token (JWT) and return the decoded payload.
+    Returns None if verification fails or token is not provided.
+    """
+    if not identity_token:
+        return None
+    try:
+        from jwt.algorithms import RSAAlgorithm
+        # Get the key ID from the token header
+        unverified_header = jwt.get_unverified_header(identity_token)
+        kid = unverified_header.get("kid")
+        if not kid:
+            logger.warning("Apple identity token missing kid header")
+            return None
+        
+        # Fetch Apple's public keys
+        apple_keys = await fetch_apple_public_keys()
+        if not apple_keys:
+            logger.warning("No Apple public keys available for verification")
+            return None
+        
+        # Find the matching key
+        matching_key = None
+        for key in apple_keys:
+            if key.get("kid") == kid:
+                matching_key = key
+                break
+        
+        if not matching_key:
+            logger.warning(f"No matching Apple public key for kid: {kid}")
+            return None
+        
+        # Convert JWK to public key
+        public_key = RSAAlgorithm.from_jwk(json.dumps(matching_key))
+        
+        # Decode and verify the token
+        decoded = jwt.decode(
+            identity_token,
+            public_key,
+            algorithms=["RS256"],
+            audience=APPLE_BUNDLE_ID,
+            issuer=APPLE_ISSUER,
+        )
+        logger.info(f"Apple identity token verified successfully, sub: {decoded.get('sub', 'unknown')[:10]}...")
+        return decoded
+    except jwt.ExpiredSignatureError:
+        logger.warning("Apple identity token expired")
+        return None
+    except jwt.InvalidAudienceError:
+        logger.warning("Apple identity token audience mismatch")
+        return None
+    except jwt.InvalidIssuerError:
+        logger.warning("Apple identity token issuer mismatch")
+        return None
+    except Exception as e:
+        logger.warning(f"Apple identity token verification failed: {e}")
+        return None
 
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -480,14 +659,21 @@ async def register(data: UserRegister):
 
 @api_router.post("/auth/login")
 async def login(data: UserLogin):
+    logger.info(f"Login attempt for email: {data.email}")
     user = await db.users.find_one({"email": data.email}, {"_id": 0})
     if not user:
+        logger.warning(f"Login failed - user not found: {data.email}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if "password_hash" not in user:
-        raise HTTPException(status_code=401, detail="Please sign in with Google")
+        # User signed up via Apple or Google - no password set
+        auth_method = "Apple" if user.get("apple_user_id") else "Google" if user.get("google_user_id") else "social"
+        logger.warning(f"Login failed - user has no password (signed up via {auth_method}): {data.email}")
+        raise HTTPException(status_code=401, detail=f"Please sign in with {auth_method}")
     if not verify_password(data.password, user["password_hash"]):
+        logger.warning(f"Login failed - wrong password: {data.email}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = create_token(user["user_id"], user["email"])
+    logger.info(f"Login successful: {data.email}")
     return {
         "token": token,
         "user": {
@@ -510,70 +696,107 @@ async def apple_auth(data: AppleAuthRequest):
     """
     Authenticate user with Apple Sign-In credentials.
     Apple only provides email/name on FIRST sign-in, so we store it.
+    If identity_token is provided, it will be verified against Apple's public keys.
     """
+    logger.info(f"Apple auth attempt - user_id prefix: {data.user_id[:10] if data.user_id else 'NONE'}..., email: {data.email}, has_name: {bool(data.full_name)}, has_token: {bool(data.identity_token)}")
+    
+    if not data.user_id or not data.user_id.strip():
+        logger.error("Apple auth failed - empty user_id")
+        raise HTTPException(status_code=400, detail="Apple user ID is required")
+    
     # Use Apple user ID as unique identifier
-    apple_user_id = data.user_id
+    apple_user_id = data.user_id.strip()
     
-    # Check if user already exists (by Apple ID stored in metadata)
-    existing = await db.users.find_one({"apple_user_id": apple_user_id}, {"_id": 0})
-    
-    if existing:
-        # Returning user - use stored info
-        user_id = existing["user_id"]
-        disclaimer_accepted = existing.get("disclaimer_accepted", False)
-        token = create_token(user_id, existing["email"])
-        return {
-            "token": token,
-            "user": {
-                "user_id": user_id,
-                "email": existing["email"],
-                "name": existing["name"],
-                "picture": existing.get("picture"),
-                "disclaimer_accepted": disclaimer_accepted
-            }
-        }
-    else:
-        # New user - create account
-        # Apple only provides email on first sign-in
-        email = data.email or f"{apple_user_id}@privaterelay.appleid.com"
-        name = data.full_name or "Apple User"
-        
-        # Check if email already exists (user might have registered with email first)
-        existing_email = await db.users.find_one({"email": email}, {"_id": 0})
-        if existing_email:
-            # Link Apple ID to existing account
-            await db.users.update_one(
-                {"email": email},
-                {"$set": {"apple_user_id": apple_user_id}}
-            )
-            user_id = existing_email["user_id"]
-            disclaimer_accepted = existing_email.get("disclaimer_accepted", False)
+    # Verify identity token if provided (enhances security)
+    verified_claims = None
+    if data.identity_token:
+        verified_claims = await verify_apple_identity_token(data.identity_token)
+        if verified_claims:
+            # Cross-check: the 'sub' claim in the token should match the user_id
+            token_sub = verified_claims.get("sub", "")
+            if token_sub != apple_user_id:
+                logger.warning(f"Apple auth - user_id mismatch: provided={apple_user_id[:10]}..., token_sub={token_sub[:10]}...")
+                raise HTTPException(status_code=401, detail="Apple authentication failed - user ID mismatch")
+            # Use email from verified token if available (more trustworthy)
+            if verified_claims.get("email") and not data.email:
+                data.email = verified_claims["email"]
+            logger.info("Apple identity token verified successfully")
         else:
-            # Create new user
-            user_id = f"user_{uuid.uuid4().hex[:12]}"
-            await db.users.insert_one({
-                "user_id": user_id,
-                "apple_user_id": apple_user_id,
-                "email": email,
-                "name": name,
-                "picture": None,
-                "disclaimer_accepted": False,
-                "disclaimer_accepted_at": None,
-                "created_at": datetime.now(timezone.utc).isoformat()
-            })
-            disclaimer_accepted = False
+            # Token was provided but couldn't be verified - log but don't block
+            # (token might be expired by the time it reaches backend)
+            logger.warning("Apple identity token provided but verification failed - proceeding with unverified auth")
+    
+    try:
+        # Check if user already exists (by Apple ID stored in metadata)
+        existing = await db.users.find_one({"apple_user_id": apple_user_id}, {"_id": 0})
         
-        token = create_token(user_id, email)
-        return {
-            "token": token,
-            "user": {
-                "user_id": user_id,
-                "email": email,
-                "name": name,
-                "picture": None,
-                "disclaimer_accepted": disclaimer_accepted
+        if existing:
+            # Returning user - use stored info
+            user_id = existing["user_id"]
+            disclaimer_accepted = existing.get("disclaimer_accepted", False)
+            token = create_token(user_id, existing["email"])
+            logger.info(f"Apple auth success (returning user): {existing['email']}")
+            return {
+                "token": token,
+                "user": {
+                    "user_id": user_id,
+                    "email": existing["email"],
+                    "name": existing["name"],
+                    "picture": existing.get("picture"),
+                    "disclaimer_accepted": disclaimer_accepted
+                },
+                "token_verified": verified_claims is not None
             }
-        }
+        else:
+            # New user - create account
+            # Apple only provides email on first sign-in
+            email = data.email or f"{apple_user_id[:20]}@privaterelay.appleid.com"
+            name = data.full_name or "Apple User"
+            
+            # Check if email already exists (user might have registered with email first)
+            existing_email = await db.users.find_one({"email": email}, {"_id": 0})
+            if existing_email:
+                # Link Apple ID to existing account
+                await db.users.update_one(
+                    {"email": email},
+                    {"$set": {"apple_user_id": apple_user_id}}
+                )
+                user_id = existing_email["user_id"]
+                disclaimer_accepted = existing_email.get("disclaimer_accepted", False)
+                logger.info(f"Apple auth success (linked to existing account): {email}")
+            else:
+                # Create new user
+                user_id = f"user_{uuid.uuid4().hex[:12]}"
+                await db.users.insert_one({
+                    "user_id": user_id,
+                    "apple_user_id": apple_user_id,
+                    "email": email,
+                    "name": name,
+                    "picture": None,
+                    "disclaimer_accepted": False,
+                    "disclaimer_accepted_at": None,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                })
+                disclaimer_accepted = False
+                logger.info(f"Apple auth success (new user created): {email}")
+            
+            token = create_token(user_id, email)
+            return {
+                "token": token,
+                "user": {
+                    "user_id": user_id,
+                    "email": email,
+                    "name": name,
+                    "picture": None,
+                    "disclaimer_accepted": disclaimer_accepted
+                },
+                "token_verified": verified_claims is not None
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Apple auth unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Authentication failed. Please try again.")
 
 @api_router.post("/auth/google")
 async def google_auth(request: Request):
@@ -1239,28 +1462,22 @@ async def delete_profile_photo(recipient_id: str, user: dict = Depends(get_curre
 @api_router.post("/transcribe")
 async def transcribe_audio(data: AudioTranscriptionRequest, user: dict = Depends(get_current_user)):
     """Convert voice recording to text using OpenAI Whisper API."""
+    if not openai_client:
+        raise HTTPException(status_code=500, detail="AI service not configured. Set OPENAI_API_KEY.")
     try:
-        # Decode base64 audio
-        # Expected format: data:audio/wav;base64,... or just the base64 string
         audio_data = data.audio_base64
         if ',' in audio_data:
             audio_data = audio_data.split(',')[1]
         
         audio_bytes = base64.b64decode(audio_data)
-        
-        # Create file-like object
         audio_file = io.BytesIO(audio_bytes)
         audio_file.name = "recording.wav"
         
-        # Initialize STT client
-        stt = OpenAISpeechToText(api_key=EMERGENT_LLM_KEY)
-        
-        # Transcribe
-        response = await stt.transcribe(
-            file=audio_file,
+        response = await openai_client.audio.transcriptions.create(
             model="whisper-1",
+            file=audio_file,
             response_format="json",
-            language=data.language
+            language=data.language,
         )
         
         return {"text": response.text, "success": True}
@@ -1273,8 +1490,6 @@ async def transcribe_audio(data: AudioTranscriptionRequest, user: dict = Depends
 async def summarize_appointment(data: SummarizeAppointmentRequest, user: dict = Depends(get_current_user)):
     """Use AI to summarize a doctor appointment transcript and extract key medical information."""
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        
         system_prompt = """You are a medical assistant helping caregivers understand doctor appointments.
 Analyze the appointment transcript and extract key information in a structured format.
 
@@ -1288,21 +1503,14 @@ Please provide:
 
 Be concise but thorough. If information is not mentioned in the transcript, indicate "Not discussed"."""
 
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"appointment_summary_{uuid.uuid4().hex[:8]}",
-            system_message=system_prompt
-        )
-        chat.with_model("openai", "gpt-4o-mini")
-
-        user_message = UserMessage(text=f"""Please summarize this doctor appointment recording:
+        user_msg = f"""Please summarize this doctor appointment recording:
 
 Appointment: {data.appointment_title or 'Doctor Visit'}
 
 Transcript:
-{data.transcript}""")
+{data.transcript}"""
 
-        response = await chat.send_message(user_message)
+        response = await ai_chat_completion(system_prompt, user_msg, model="gpt-4o-mini")
         
         return {
             "summary": response,
@@ -1735,25 +1943,12 @@ async def check_medication_interactions(data: MedicationInteractionRequest, user
     if len(data.medications) < 2:
         return {"interactions": [], "summary": "Need at least 2 medications to check interactions."}
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
         med_list = ", ".join(data.medications)
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"med_interaction_{uuid.uuid4().hex[:8]}",
-            system_message="You are a pharmaceutical expert assistant. You provide medication interaction information for caregivers. Always include a disclaimer that this is informational only and users should consult their pharmacist or doctor. Be concise and practical. Format your response as JSON with keys: 'interactions' (array of objects with 'medications', 'severity', 'description') and 'summary' (brief overall assessment)."
-        )
-        chat.with_model("openai", "gpt-4o-mini")
-        user_message = UserMessage(text=f"Check for potential drug interactions between these medications: {med_list}. Return the response as valid JSON.")
-        response = await chat.send_message(user_message)
-        import json
+        system_msg = "You are a pharmaceutical expert assistant. You provide medication interaction information for caregivers. Always include a disclaimer that this is informational only and users should consult their pharmacist or doctor. Be concise and practical. Format your response as JSON with keys: 'interactions' (array of objects with 'medications', 'severity', 'description') and 'summary' (brief overall assessment)."
+        user_msg = f"Check for potential drug interactions between these medications: {med_list}. Return the response as valid JSON."
+        response = await ai_chat_completion(system_msg, user_msg, model="gpt-4o-mini")
         try:
-            clean = response.strip()
-            if clean.startswith("```"):
-                clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
-                if clean.endswith("```"):
-                    clean = clean[:-3]
-                clean = clean.strip()
-            result = json.loads(clean)
+            result = json.loads(clean_json_response(response))
             return result
         except json.JSONDecodeError:
             return {"interactions": [], "summary": response, "raw": True}
@@ -1777,24 +1972,11 @@ Medications: {', '.join([m.get('name', '') + ' (' + m.get('dosage', '') + ')' fo
 Upcoming appointments: {', '.join([a.get('title', '') + ' on ' + a.get('date', '') for a in appts[:5]])}
 Recent incidents: {', '.join([i.get('description', '') for i in incidents[:3]])}"""
 
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"reminders_{uuid.uuid4().hex[:8]}",
-            system_message="You are a caring and knowledgeable elder care assistant. Generate helpful, practical reminders and suggestions for family caregivers based on the care recipient's profile. Be warm, supportive, and actionable. Return as JSON with key 'reminders' (array of objects with 'title', 'description', 'priority' (high/medium/low), 'category' (medication/health/safety/appointment/wellness))."
-        )
-        chat.with_model("openai", "gpt-4o-mini")
-        msg = UserMessage(text=f"Based on this care profile, generate 5-8 smart care reminders:\n{context}\nReturn as valid JSON.")
-        response = await chat.send_message(msg)
-        import json
+        system_msg = "You are a caring and knowledgeable elder care assistant. Generate helpful, practical reminders and suggestions for family caregivers based on the care recipient's profile. Be warm, supportive, and actionable. Return as JSON with key 'reminders' (array of objects with 'title', 'description', 'priority' (high/medium/low), 'category' (medication/health/safety/appointment/wellness))."
+        user_msg = f"Based on this care profile, generate 5-8 smart care reminders:\n{context}\nReturn as valid JSON."
+        response = await ai_chat_completion(system_msg, user_msg, model="gpt-4o-mini")
         try:
-            clean = response.strip()
-            if clean.startswith("```"):
-                clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
-                if clean.endswith("```"):
-                    clean = clean[:-3]
-                clean = clean.strip()
-            result = json.loads(clean)
+            result = json.loads(clean_json_response(response))
             return result
         except json.JSONDecodeError:
             return {"reminders": [{"title": "Care Tip", "description": response, "priority": "medium", "category": "wellness"}]}
@@ -2251,7 +2433,7 @@ async def search_caregiver_resources(data: ResourceSearchRequest, user: dict = D
     AI-powered search for caregiver support resources based on location and category.
     Uses GPT to find and format relevant local resources.
     """
-    if not EMERGENT_LLM_KEY:
+    if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="AI service not configured")
     
     category_description = RESOURCE_CATEGORIES.get(data.category, data.category)
@@ -2291,25 +2473,11 @@ Example format:
 ]"""
 
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"resource_search_{user['user_id']}_{uuid.uuid4().hex[:8]}",
-            system_message="You are a knowledgeable assistant that helps caregivers find support resources. Always provide accurate, real-world information about actual organizations and programs."
-        ).with_model("openai", "gpt-4o")
-        
-        user_message = UserMessage(text=search_prompt)
-        response = await chat.send_message(user_message)
+        system_msg = "You are a knowledgeable assistant that helps caregivers find support resources. Always provide accurate, real-world information about actual organizations and programs."
+        response = await ai_chat_completion(system_msg, search_prompt, model="gpt-4o")
         
         # Parse the JSON response
-        # Clean up the response - remove markdown code blocks if present
-        cleaned_response = response.strip()
-        if cleaned_response.startswith("```json"):
-            cleaned_response = cleaned_response[7:]
-        if cleaned_response.startswith("```"):
-            cleaned_response = cleaned_response[3:]
-        if cleaned_response.endswith("```"):
-            cleaned_response = cleaned_response[:-3]
-        cleaned_response = cleaned_response.strip()
+        cleaned_response = clean_json_response(response)
         
         resources = json.loads(cleaned_response)
         

@@ -20,7 +20,7 @@ export default function DailyRoutineScreen() {
   const load = useCallback(async () => {
     if (!selectedRecipientId) { setLoading(false); return; }
     try { setItems(await api.get(`/care-recipients/${selectedRecipientId}/routines`)); } 
-    catch (e) { console.error(e); } 
+    catch (e) {  } 
     finally { setLoading(false); }
   }, [selectedRecipientId]);
   

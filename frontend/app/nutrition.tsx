@@ -36,7 +36,7 @@ export default function NutritionScreen() {
       if (data.favorite_meals) {
         setFavoriteMeals(data.favorite_meals);
       }
-    } catch (e) { console.error(e); }
+    } catch (e) {  }
     finally { setLoading(false); }
   }, [selectedRecipientId]);
 
@@ -127,7 +127,7 @@ export default function NutritionScreen() {
                 <View style={s.mealsGrid}>
                   {(favoriteMeals[category.key] || []).map((meal: string, index: number) => (
                     <TouchableOpacity
-                      key={index}
+                      key={`${category.key}-${meal}-${index}`}
                       style={[s.mealChip, { borderColor: category.color + '40' }]}
                       onLongPress={() => handleRemoveMeal(category.key, index)}
                     >

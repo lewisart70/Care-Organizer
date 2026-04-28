@@ -42,7 +42,7 @@ export default function MedicationsTab() {
       if (recipientData.pharmacy_info) {
         setPharmacyInfo(recipientData.pharmacy_info);
       }
-    } catch (e) { console.error(e); }
+    } catch (e) {  }
     finally { setLoading(false); }
   }, [selectedRecipientId]);
 

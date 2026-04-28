@@ -5,7 +5,7 @@ import json
 import sys
 
 # Use the correct backend URL from frontend .env
-BACKEND_URL = "https://family-care-check.preview.emergentagent.com/api"
+BACKEND_URL = "https://railway-recovery.preview.emergentagent.com/api"
 
 def log(message):
     print(f"[INFO] {message}")

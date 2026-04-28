@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 
 # Configuration
-BASE_URL = "https://family-care-check.preview.emergentagent.com/api"
+BASE_URL = "https://railway-recovery.preview.emergentagent.com/api"
 print(f"🧪 FAMILY CARE ORGANIZER - COMPLIANCE & PRIVACY TESTING")
 print(f"🔗 Backend URL: {BASE_URL}")
 print(f"⚡ Testing all compliance endpoints for PIPEDA/HIPAA requirements")

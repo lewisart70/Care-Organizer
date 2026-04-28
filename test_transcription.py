@@ -8,7 +8,7 @@ import wave
 import struct
 import io
 
-BASE_URL = "https://family-care-check.preview.emergentagent.com/api"
+BASE_URL = "https://railway-recovery.preview.emergentagent.com/api"
 TEST_EMAIL = "caretest@example.com"
 TEST_PASSWORD = "SecurePass123!"
 

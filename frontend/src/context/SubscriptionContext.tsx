@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { Platform, Alert } from 'react-native';
 import Purchases, { LOG_LEVEL, PurchasesOffering, CustomerInfo, PurchasesPackage } from 'react-native-purchases';
 import { useAuth } from './AuthContext';
@@ -56,71 +56,60 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     careTeamInvites: 0,
   });
 
+  const updateSubscriptionStatus = useCallback((info: CustomerInfo) => {
+    setCustomerInfo(info);
+    const premiumEntitlement = info.entitlements.active['Premium'];
+    const isActive = !!premiumEntitlement;
+    setIsSubscribed(isActive);
+    setIsTrialActive(isActive && premiumEntitlement.periodType === 'TRIAL');
+  }, []);
+
   // Initialize RevenueCat
   useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
     const initPurchases = async () => {
       try {
-        // Only initialize on native platforms
         if (Platform.OS === 'web') {
-          console.log('RevenueCat not supported on web');
           setLoading(false);
           return;
         }
 
         Purchases.setLogLevel(LOG_LEVEL.DEBUG);
-        
+
         await Purchases.configure({
           apiKey: REVENUECAT_API_KEY,
-          appUserID: user?.user_id || undefined,
+          appUserID: user.user_id || undefined,
         });
 
-        // Get customer info
         const info = await Purchases.getCustomerInfo();
-        updateSubscriptionStatus(info);
+        if (!cancelled) updateSubscriptionStatus(info);
 
-        // Get offerings
         const offeringsResult = await Purchases.getOfferings();
-        if (offeringsResult.current) {
+        if (!cancelled && offeringsResult.current) {
           setOfferings(offeringsResult.current);
         }
 
-        // Listen for customer info updates
-        Purchases.addCustomerInfoUpdateListener((info) => {
-          updateSubscriptionStatus(info);
+        Purchases.addCustomerInfoUpdateListener((updatedInfo) => {
+          if (!cancelled) updateSubscriptionStatus(updatedInfo);
         });
-
       } catch (error) {
-        console.error('Failed to initialize RevenueCat:', error);
+        // RevenueCat init failed silently
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    if (user) {
-      initPurchases();
-    } else {
-      setLoading(false);
-    }
-  }, [user]);
+    initPurchases();
+    return () => { cancelled = true; };
+  }, [user, updateSubscriptionStatus]);
 
-  const updateSubscriptionStatus = (info: CustomerInfo) => {
-    setCustomerInfo(info);
-    
-    // Check for active entitlements - using "Premium" entitlement
-    const premiumEntitlement = info.entitlements.active['Premium'];
-    const isActive = !!premiumEntitlement;
-    setIsSubscribed(isActive);
-    
-    // Check if in trial period
-    if (premiumEntitlement) {
-      const periodType = premiumEntitlement.periodType;
-      setIsTrialActive(periodType === 'TRIAL');
-    } else {
-      setIsTrialActive(false);
-    }
-  };
-
-  const purchasePackage = async (pkg: PurchasesPackage): Promise<boolean> => {
+  const purchasePackage = useCallback(async (pkg: PurchasesPackage): Promise<boolean> => {
     try {
       const { customerInfo: newInfo } = await Purchases.purchasePackage(pkg);
       updateSubscriptionStatus(newInfo);
@@ -131,13 +120,13 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       }
       return false;
     }
-  };
+  }, [updateSubscriptionStatus]);
 
-  const restorePurchases = async (): Promise<boolean> => {
+  const restorePurchases = useCallback(async (): Promise<boolean> => {
     try {
       const info = await Purchases.restorePurchases();
       updateSubscriptionStatus(info);
-      
+
       if (info.entitlements.active['Premium']) {
         Alert.alert('Success', 'Your subscription has been restored!');
         return true;
@@ -149,7 +138,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       Alert.alert('Restore Error', error.message || 'Failed to restore purchases');
       return false;
     }
-  };
+  }, [updateSubscriptionStatus]);
 
   const getLimits = useCallback(() => {
     return isSubscribed ? PREMIUM_LIMITS : FREE_LIMITS;
@@ -157,17 +146,15 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
   const checkFeatureAccess = useCallback((feature: 'ai' | 'pdf' | 'recipients' | 'invites'): boolean => {
     if (isSubscribed) return true;
-    
-    const limits = FREE_LIMITS;
     switch (feature) {
       case 'ai':
-        return usageCounts.aiQueries < limits.aiQueriesPerMonth;
+        return usageCounts.aiQueries < FREE_LIMITS.aiQueriesPerMonth;
       case 'pdf':
-        return usageCounts.pdfExports < limits.pdfExportsPerMonth;
+        return usageCounts.pdfExports < FREE_LIMITS.pdfExportsPerMonth;
       case 'recipients':
-        return usageCounts.careRecipients < limits.careRecipients;
+        return usageCounts.careRecipients < FREE_LIMITS.careRecipients;
       case 'invites':
-        return usageCounts.careTeamInvites < limits.careTeamInvites;
+        return usageCounts.careTeamInvites < FREE_LIMITS.careTeamInvites;
       default:
         return true;
     }
@@ -181,22 +168,25 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     }));
   }, []);
 
+  const contextValue = useMemo<SubscriptionContextType>(() => ({
+    isSubscribed,
+    isTrialActive,
+    customerInfo,
+    offerings,
+    loading,
+    usageCounts,
+    purchasePackage,
+    restorePurchases,
+    checkFeatureAccess,
+    incrementUsage,
+    getLimits,
+  }), [
+    isSubscribed, isTrialActive, customerInfo, offerings, loading, usageCounts,
+    purchasePackage, restorePurchases, checkFeatureAccess, incrementUsage, getLimits,
+  ]);
+
   return (
-    <SubscriptionContext.Provider
-      value={{
-        isSubscribed,
-        isTrialActive,
-        customerInfo,
-        offerings,
-        loading,
-        usageCounts,
-        purchasePackage,
-        restorePurchases,
-        checkFeatureAccess,
-        incrementUsage,
-        getLimits,
-      }}
-    >
+    <SubscriptionContext.Provider value={contextValue}>
       {children}
     </SubscriptionContext.Provider>
   );

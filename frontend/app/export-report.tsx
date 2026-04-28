@@ -60,7 +60,6 @@ export default function ExportReportScreen() {
       // Select all sections by default
       setSelectedSections((result.sections || []).map((s: Section) => s.id));
     } catch (e) {
-      console.error('Failed to load sections:', e);
       // Fallback sections
       const fallback = [
         { id: 'medications', name: 'Medications', icon: 'medical' },
@@ -169,7 +168,6 @@ export default function ExportReportScreen() {
             Alert.alert('Success', `Report saved to ${filename}`);
           }
         } catch (fetchError: any) {
-          console.error('Fetch error:', fetchError);
           throw new Error(fetchError.message || 'Network request failed');
         }
         
@@ -188,7 +186,6 @@ export default function ExportReportScreen() {
         setShowSuccessModal(true);
       }
     } catch (e: any) {
-      console.error('Export error:', e);
       Alert.alert('Export Failed', e.message || 'Failed to generate report. Please try again.');
     } finally {
       setLoading(false);

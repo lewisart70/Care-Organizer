@@ -8,6 +8,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../src/context/AuthContext';
 import { api } from '../src/utils/api';
 import { COLORS, SPACING, FONT_SIZES, RADIUS } from '../src/constants/theme';
+import AppointmentCard from '../src/components/appointments/AppointmentCard';
+import AISummaryModalContent from '../src/components/appointments/AISummaryModal';
 
 // Appointment categories
 const CATEGORIES = [
@@ -60,7 +62,7 @@ export default function AppointmentsScreen() {
   const load = useCallback(async () => {
     if (!selectedRecipientId) { setLoading(false); return; }
     try { setItems(await api.get(`/care-recipients/${selectedRecipientId}/appointments`)); }
-    catch (e) { console.error(e); } finally { setLoading(false); }
+    catch (e) {  } finally { setLoading(false); }
   }, [selectedRecipientId]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -125,7 +127,6 @@ export default function AppointmentsScreen() {
       await recorder.record();
       setIsRecording(true);
     } catch (err) {
-      console.error('Failed to start recording:', err);
       Alert.alert('Error', 'Failed to start recording. Please check microphone permissions.');
     }
   };
@@ -165,7 +166,6 @@ export default function AppointmentsScreen() {
         }
       }
     } catch (err: any) {
-      console.error('Transcription error:', err);
       Alert.alert('Transcription Failed', err.message || 'Could not transcribe audio');
     } finally {
       setIsTranscribing(false);
@@ -191,7 +191,6 @@ export default function AppointmentsScreen() {
         setShowSummary(true);
       }
     } catch (err: any) {
-      console.error('Summarization error:', err);
       Alert.alert('Summarization Failed', err.message || 'Could not summarize the recording');
     } finally {
       setIsSummarizing(false);
@@ -238,10 +237,6 @@ export default function AppointmentsScreen() {
     );
   };
 
-  const getCategoryInfo = (categoryId: string) => {
-    return CATEGORIES.find(c => c.id === categoryId) || CATEGORIES[CATEGORIES.length - 1];
-  };
-
   return (
     <SafeAreaView style={s.container}>
       <View style={s.header}>
@@ -266,71 +261,14 @@ export default function AppointmentsScreen() {
         {loading ? <ActivityIndicator color={COLORS.primary} style={{ marginTop: SPACING.xl }} /> :
           items.length === 0 ? (
             <View style={s.empty}><Ionicons name="calendar-outline" size={48} color={COLORS.primaryLight} /><Text style={s.emptyTitle}>No appointments</Text></View>
-          ) : items.map(a => {
-            const cat = getCategoryInfo(a.category);
-            return (
-              <TouchableOpacity key={a.appointment_id} style={[s.card, { borderLeftColor: cat.color }]} onPress={() => openEditModal(a)} activeOpacity={0.7}>
-                <View style={s.row}>
-                  <View style={s.dateBox}>
-                    <Ionicons name="calendar" size={20} color={COLORS.primary} />
-                    <Text style={s.dateText}>{a.date}</Text>
-                  </View>
-                  <View style={s.cardActions}>
-                    <TouchableOpacity testID={`edit-appt-${a.appointment_id}`} style={s.actionBtn} onPress={() => openEditModal(a)}>
-                      <Ionicons name="pencil" size={16} color={COLORS.primary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity testID={`del-appt-${a.appointment_id}`} style={s.actionBtn} onPress={() => handleDelete(a.appointment_id, a.title)}>
-                      <Ionicons name="trash-outline" size={16} color={COLORS.error} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                
-                {/* Category Badge */}
-                {a.category && (
-                  <View style={[s.categoryBadge, { backgroundColor: cat.color + '20' }]}>
-                    <Ionicons name={cat.icon as any} size={12} color={cat.color} />
-                    <Text style={[s.categoryText, { color: cat.color }]}>{cat.label}</Text>
-                  </View>
-                )}
-                
-                <Text style={s.cardTitle}>{a.title}</Text>
-                {a.time && <Text style={s.cardSub}><Ionicons name="time-outline" size={14} /> {a.time}</Text>}
-                {a.doctor_name && <Text style={s.cardSub}><Ionicons name="person-outline" size={14} /> {a.doctor_name}</Text>}
-                {a.location && <Text style={s.cardSub}><Ionicons name="location-outline" size={14} /> {a.location}</Text>}
-                
-                {/* Vitals if recorded */}
-                {(a.blood_pressure || a.weight) && (
-                  <View style={s.vitalsRow}>
-                    {a.blood_pressure && (
-                      <View style={s.vitalChip}>
-                        <Ionicons name="heart" size={12} color={COLORS.error} />
-                        <Text style={s.vitalText}>BP: {a.blood_pressure}</Text>
-                      </View>
-                    )}
-                    {a.weight && (
-                      <View style={s.vitalChip}>
-                        <Ionicons name="scale" size={12} color={COLORS.secondary} />
-                        <Text style={s.vitalText}>{a.weight}</Text>
-                      </View>
-                    )}
-                  </View>
-                )}
-                
-                {/* Repeat indicator */}
-                {a.repeats && a.repeat_frequency && (
-                  <View style={s.repeatBadge}>
-                    <Ionicons name="repeat" size={12} color={COLORS.info} />
-                    <Text style={s.repeatText}>Repeats {a.repeat_frequency}</Text>
-                  </View>
-                )}
-                
-                {a.notes && <Text style={s.cardNotes} numberOfLines={3}>{a.notes}</Text>}
-                <View style={s.editHint}>
-                  <Text style={s.editHintText}>Tap to edit</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+          ) : items.map(a => (
+              <AppointmentCard
+                key={a.appointment_id}
+                appointment={a}
+                onEdit={openEditModal}
+                onDelete={handleDelete}
+              />
+            ))}
       </ScrollView>
       
       {/* Add/Edit Appointment Modal */}
@@ -604,35 +542,17 @@ export default function AppointmentsScreen() {
       
       {/* AI Summary Modal */}
       <Modal visible={showSummary} animationType="slide" transparent>
-        <View style={s.summaryOverlay}>
-          <View style={s.summaryModal}>
-            <View style={s.summaryHeader}>
-              <View style={s.summaryTitleRow}>
-                <Ionicons name="sparkles" size={24} color={COLORS.secondary} />
-                <Text style={s.summaryTitle}>AI Summary</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowSummary(false)}>
-                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={s.summaryContent}>
-              <Text style={s.summaryText}>{summary}</Text>
-            </ScrollView>
-            <TouchableOpacity 
-              style={s.addToNotesBtn}
-              onPress={() => {
-                setForm(prev => ({
-                  ...prev,
-                  notes: prev.notes + '\n\n--- AI Summary ---\n' + summary
-                }));
-                setShowSummary(false);
-              }}
-            >
-              <Ionicons name="add" size={20} color={COLORS.white} />
-              <Text style={s.addToNotesBtnText}>Add Summary to Notes</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <AISummaryModalContent
+          summary={summary}
+          onClose={() => setShowSummary(false)}
+          onAddToNotes={() => {
+            setForm(prev => ({
+              ...prev,
+              notes: prev.notes + '\n\n--- AI Summary ---\n' + summary
+            }));
+            setShowSummary(false);
+          }}
+        />
       </Modal>
     </SafeAreaView>
   );
@@ -672,72 +592,6 @@ const s = StyleSheet.create({
   
   empty: { alignItems: 'center', paddingVertical: SPACING.xxl },
   emptyTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary, marginTop: SPACING.md },
-  card: { marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, padding: SPACING.md, backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, borderLeftWidth: 3, borderLeftColor: COLORS.primary },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  dateBox: { flexDirection: 'row', alignItems: 'center' },
-  dateText: { fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: '600', marginLeft: 4 },
-  cardActions: { flexDirection: 'row', gap: SPACING.sm },
-  actionBtn: { padding: SPACING.xs, borderRadius: RADIUS.md },
-  cardTitle: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary, marginTop: 4 },
-  cardSub: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
-  cardNotes: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: SPACING.sm, fontStyle: 'italic', backgroundColor: COLORS.background, padding: SPACING.sm, borderRadius: RADIUS.md },
-  editHint: { alignItems: 'flex-end', marginTop: SPACING.xs },
-  editHintText: { fontSize: FONT_SIZES.xs, color: COLORS.border, fontStyle: 'italic' },
-  
-  // Category badge styles
-  categoryBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: RADIUS.full,
-    marginTop: SPACING.xs,
-    gap: 4,
-  },
-  categoryText: {
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '700',
-  },
-  
-  // Vitals in card
-  vitalsRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    marginTop: SPACING.sm,
-  },
-  vitalChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: RADIUS.md,
-    gap: 4,
-  },
-  vitalText: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textPrimary,
-    fontWeight: '600',
-  },
-  
-  // Repeat badge in card
-  repeatBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: COLORS.info + '15',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: RADIUS.md,
-    marginTop: SPACING.xs,
-    gap: 4,
-  },
-  repeatText: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.info,
-    fontWeight: '600',
-  },
   
   modal: { flex: 1, backgroundColor: COLORS.background },
   mHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, borderBottomWidth: 1, borderBottomColor: COLORS.border },
@@ -995,60 +849,5 @@ const s = StyleSheet.create({
     fontSize: FONT_SIZES.xs,
     color: COLORS.info,
     fontWeight: '600',
-  },
-  
-  // Summary modal styles
-  summaryOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  summaryModal: {
-    backgroundColor: COLORS.surface,
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-    maxHeight: '80%',
-  },
-  summaryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  summaryTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  summaryTitle: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  summaryContent: {
-    padding: SPACING.lg,
-    maxHeight: 400,
-  },
-  summaryText: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textPrimary,
-    lineHeight: 22,
-  },
-  addToNotesBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.primary,
-    margin: SPACING.lg,
-    padding: SPACING.md,
-    borderRadius: RADIUS.lg,
-    gap: 8,
-  },
-  addToNotesBtnText: {
-    color: COLORS.white,
-    fontSize: FONT_SIZES.md,
-    fontWeight: '700',
   },
 });

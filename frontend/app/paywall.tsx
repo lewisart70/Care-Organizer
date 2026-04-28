@@ -138,8 +138,8 @@ export default function PaywallScreen() {
         {/* Features Comparison */}
         <View style={styles.featuresSection}>
           <Text style={styles.sectionTitle}>What You Get</Text>
-          {FEATURES.map((feature, index) => (
-            <View key={index} style={styles.featureRow}>
+          {FEATURES.map((feature) => (
+            <View key={feature.title} style={styles.featureRow}>
               <View style={styles.featureIcon}>
                 <Ionicons name={feature.icon as any} size={20} color={COLORS.primary} />
               </View>
