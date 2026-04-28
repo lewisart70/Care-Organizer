@@ -118,23 +118,12 @@ export default function LoginScreen() {
         ],
       });
 
-        hasUser: !!credential.user, 
-        hasEmail: !!credential.email,
-        hasFullName: !!credential.fullName,
-        hasIdentityToken: !!credential.identityToken
-      });
 
       // Get user info from credential
       // Note: Apple only provides email/name on FIRST sign-in
       const fullName = credential.fullName
         ? `${credential.fullName.givenName || ''} ${credential.fullName.familyName || ''}`.trim()
         : undefined;
-
-        userId: credential.user?.substring(0, 10) + '...', 
-        email: credential.email,
-        fullName,
-        hasIdentityToken: !!credential.identityToken
-      });
 
       // Use AuthContext to login with Apple (includes identity token for server-side verification)
       await loginWithApple(
