@@ -72,7 +72,11 @@ export default function LoginScreen() {
       router.replace('/(tabs)/home');
     } catch (e: any) {
       console.error('Google login error:', e);
-      setError(e.message || 'Google Sign-In failed');
+      const msg = e.message?.includes('Network request failed') || e.message?.includes('Request failed')
+        ? 'Could not connect to server. Please check your internet connection and try again.'
+        : e.message || 'Google Sign-In failed';
+      setError(msg);
+      Alert.alert('Sign-In Failed', msg);
     } finally {
       setLoading(false);
     }
@@ -89,7 +93,11 @@ export default function LoginScreen() {
       await login(email.trim(), password);
       router.replace('/(tabs)/home');
     } catch (e: any) {
-      setError(e.message || 'Login failed');
+      const msg = e.message?.includes('Network request failed') || e.message?.includes('Request failed')
+        ? 'Could not connect to server. Please check your internet connection and try again.'
+        : e.message || 'Login failed';
+      setError(msg);
+      Alert.alert('Sign-In Failed', msg);
     } finally {
       setLoading(false);
     }
@@ -134,7 +142,11 @@ export default function LoginScreen() {
         console.log('User cancelled Apple Sign-In');
       } else {
         console.error('Apple Sign-In error:', error);
-        setError(error.message || 'Apple Sign-In failed. Please try again.');
+        const msg = error.message?.includes('Network request failed') || error.message?.includes('Request failed')
+          ? 'Could not connect to server. Please check your internet connection and try again.'
+          : error.message || 'Apple Sign-In failed. Please try again.';
+        setError(msg);
+        Alert.alert('Sign-In Failed', msg);
       }
     } finally {
       setLoading(false);
