@@ -141,10 +141,6 @@ export default function LoginScreen() {
       if (error.code === 'ERR_REQUEST_CANCELED') {
         // User cancelled - don't show error
       } else {
-          message: error.message, 
-          code: error.code,
-          name: error.name 
-        });
         setError(error.message || 'Apple Sign-In failed. Please try again.');
       }
     } finally {
